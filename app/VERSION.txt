@@ -1,0 +1,1 @@
+diagramador-picmimos V3 - primeira lamina em branco, canvas ajustado ao viewport, botoes principais ativos
