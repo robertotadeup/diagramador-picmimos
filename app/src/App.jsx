@@ -1,830 +1,693 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import * as htmlToImage from "html-to-image";
 
-const MAX_PHOTOS_PER_SPREAD = 20;
-const MIN_FRAME_SIZE = 6;
+const MAX_PAGES = 120;
+const MIN_PAGES = 20;
+const SAFETY_MARGIN_CM = 0.3;
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
+const FORMATS = [
+  { id: "15x15", label: "15x15", closedW: 15, closedH: 15, spreadW: 30, spreadH: 15.2, orientation: "quadrado" },
+  { id: "15x21-v", label: "15x21 vertical", closedW: 15, closedH: 21, spreadW: 30, spreadH: 20.4, orientation: "vertical" },
+  { id: "15x21-h", label: "15x21 horizontal", closedW: 21, closedH: 15, spreadW: 42, spreadH: 15.2, orientation: "horizontal" },
+  { id: "20x20", label: "20x20", closedW: 20, closedH: 20, spreadW: 40, spreadH: 20.3, orientation: "quadrado" },
+  { id: "20x25-v", label: "20x25 vertical", closedW: 20, closedH: 25, spreadW: 40, spreadH: 25.4, orientation: "vertical" },
+  { id: "20x25-h", label: "20x25 horizontal", closedW: 25, closedH: 20, spreadW: 50, spreadH: 20.3, orientation: "horizontal" },
+  { id: "25x25", label: "25x25", closedW: 25, closedH: 25, spreadW: 50, spreadH: 25.4, orientation: "quadrado" },
+  { id: "30x30", label: "30x30", closedW: 30, closedH: 30, spreadW: 60, spreadH: 30.5, orientation: "quadrado" },
+  { id: "30x40", label: "30x40", closedW: 30, closedH: 40, spreadW: 60, spreadH: 40.0, orientation: "vertical" },
+];
+
+const TEXTURES = [
+  { id: "preto", label: "Courino Preto", css: "linear-gradient(135deg, #111 0%, #333 50%, #080808 100%)" },
+  { id: "marrom", label: "Courino Marrom", css: "linear-gradient(135deg, #5a351f 0%, #7d5132 48%, #3b2114 100%)" },
+  { id: "champagne", label: "Dune Champagne", css: "linear-gradient(135deg, #d7c5a0 0%, #efe3c7 52%, #bca878 100%)" },
+  { id: "cinza", label: "Courino Cinza", css: "linear-gradient(135deg, #5f6265 0%, #9a9da0 50%, #404245 100%)" },
+  { id: "branco", label: "Courino Branco", css: "linear-gradient(135deg, #eeeeee 0%, #ffffff 45%, #d7d7d7 100%)" },
+];
+
+const DEMO_PHOTOS = [
+  "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1521335629791-ce4aec67dd47?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1502635385003-ee1e6a1a742d?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80",
+];
 
 function uid(prefix = "id") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function pct(value) {
-  return Math.round(value * 100) / 100;
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function unique(ids) {
-  return Array.from(new Set(ids)).slice(0, MAX_PHOTOS_PER_SPREAD);
+function makeDemoPhotos() {
+  return DEMO_PHOTOS.map((src, index) => ({ id: uid("demo"), src, name: `Foto demo ${index + 1}` }));
 }
 
-function buildGrid(count, cols, rows, margin = 3.2, gap = 1.4) {
-  const cellW = (100 - margin * 2 - gap * (cols - 1)) / cols;
-  const cellH = (100 - margin * 2 - gap * (rows - 1)) / rows;
+function createBlankSpread(index) {
+  return {
+    id: uid("spread"),
+    name: `Página ${index * 2 + 1}-${index * 2 + 2}`,
+    frames: [],
+    texts: [],
+    layoutVariant: 0,
+  };
+}
+
+function buildBlankSpreads(pageCount) {
+  const spreadCount = pageCount / 2;
+  return Array.from({ length: spreadCount }, (_, index) => createBlankSpread(index));
+}
+
+function getSpineCm(pageCount) {
+  const laminas = pageCount / 2;
+  return laminas * 0.1; // 1 mm por lâmina = 0,1 cm
+}
+
+function getLayouts(count, variant = 0) {
+  const safeCount = clamp(count, 1, 20);
+  const layouts = [];
+
+  // Grade limpa
+  const cols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
+  const rows = Math.ceil(safeCount / cols);
+  layouts.push(gridLayout(safeCount, cols, rows, 3, 1.2));
+
+  // Destaque esquerdo
+  if (safeCount === 1) {
+    layouts.push([{ x: 12, y: 10, w: 76, h: 80 }]);
+  } else {
+    const rest = safeCount - 1;
+    const rightCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
+    const rightRows = Math.ceil(rest / rightCols);
+    const slots = [{ x: 3, y: 6, w: 53, h: 88 }];
+    const smalls = gridLayout(rest, rightCols, rightRows, 60, 1.2, 37, 88, 6);
+    layouts.push([...slots, ...smalls]);
+  }
+
+  // Destaque direito
+  if (safeCount > 1) {
+    const rest = safeCount - 1;
+    const leftCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
+    const leftRows = Math.ceil(rest / leftCols);
+    const smalls = gridLayout(rest, leftCols, leftRows, 3, 1.2, 37, 88, 6);
+    layouts.push([...smalls, { x: 44, y: 6, w: 53, h: 88 }]);
+  }
+
+  // Editorial em faixa
+  if (safeCount >= 3) {
+    const top = Math.min(3, safeCount);
+    const bottom = safeCount - top;
+    const slots = gridLayout(top, top, 1, 3, 1.2, 94, 34, 6);
+    if (bottom > 0) {
+      const bCols = Math.ceil(Math.sqrt(bottom * 2));
+      const bRows = Math.ceil(bottom / bCols);
+      slots.push(...gridLayout(bottom, bCols, bRows, 3, 1.2, 94, 48, 48));
+    }
+    layouts.push(slots.slice(0, safeCount));
+  }
+
+  return layouts[variant % layouts.length] || layouts[0];
+}
+
+function gridLayout(count, cols, rows, startX = 3, gap = 1.2, areaW = 94, areaH = 88, startY = 6) {
+  const cellW = (areaW - gap * (cols - 1)) / cols;
+  const cellH = (areaH - gap * (rows - 1)) / rows;
   return Array.from({ length: count }, (_, index) => {
     const row = Math.floor(index / cols);
     const col = index % cols;
     return {
-      x: pct(margin + col * (cellW + gap)),
-      y: pct(margin + row * (cellH + gap)),
-      w: pct(cellW),
-      h: pct(cellH),
+      x: round(startX + col * (cellW + gap)),
+      y: round(startY + row * (cellH + gap)),
+      w: round(cellW),
+      h: round(cellH),
     };
   });
 }
 
-function bestGrid(count) {
-  if (count <= 1) return { cols: 1, rows: 1 };
-  if (count === 2) return { cols: 2, rows: 1 };
-  const cols = Math.ceil(Math.sqrt(count * 2));
-  const rows = Math.ceil(count / cols);
-  return { cols, rows };
+function round(v) {
+  return Math.round(v * 100) / 100;
 }
 
-function autoGrid(count) {
-  const { cols, rows } = bestGrid(count);
-  return buildGrid(count, cols, rows);
+function createFrames(photoIds, variant = 0) {
+  const slots = getLayouts(photoIds.length, variant);
+  return slots.map((slot, index) => ({
+    id: uid("frame"),
+    photoId: photoIds[index],
+    ...slot,
+    cropScale: 1,
+    cropX: 0,
+    cropY: 0,
+  }));
 }
 
-function heroLeft(count) {
-  if (count <= 1) return [{ x: 9, y: 8, w: 82, h: 84 }];
-  if (count === 2) return [{ x: 3, y: 8, w: 46, h: 84 }, { x: 51, y: 8, w: 46, h: 84 }];
-  const heroW = count <= 6 ? 54 : 43;
-  const rest = count - 1;
-  const cols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-  const rows = Math.ceil(rest / cols);
-  const margin = 3.2;
-  const gap = 1.4;
-  const rightX = margin * 2 + heroW;
-  const rightW = 100 - rightX - margin;
-  const cellW = (rightW - gap * (cols - 1)) / cols;
-  const cellH = (88 - gap * (rows - 1)) / rows;
-  const slots = [{ x: margin, y: 6, w: heroW, h: 88 }];
-  for (let i = 0; i < rest; i += 1) {
-    const row = Math.floor(i / cols);
-    const col = i % cols;
-    slots.push({ x: pct(rightX + col * (cellW + gap)), y: pct(6 + row * (cellH + gap)), w: pct(cellW), h: pct(cellH) });
-  }
-  return slots;
-}
-
-function heroRight(count) {
-  return heroLeft(count).map((slot) => ({ ...slot, x: pct(100 - slot.x - slot.w) })).reverse();
-}
-
-function editorialStrip(count) {
-  if (count <= 3) return autoGrid(count);
-  const topCount = Math.min(3, Math.ceil(count / 3));
-  const bottomCount = count - topCount;
-  const top = buildGrid(topCount, topCount, 1, 3.2, 1.4).map((slot) => ({ ...slot, y: 5, h: 34 }));
-  const { cols, rows } = bestGrid(bottomCount);
-  const bottom = buildGrid(bottomCount, cols, rows, 3.2, 1.4).map((slot) => ({ ...slot, y: pct(45 + (slot.y - 3.2) * 0.55), h: pct(slot.h * 0.55) }));
-  return [...top, ...bottom].slice(0, count);
-}
-
-function mosaic(count) {
-  if (count <= 4) return autoGrid(count);
-  const slots = autoGrid(count);
-  if (count >= 7) {
-    const hero = Math.floor(count / 2);
-    slots[hero] = {
-      ...slots[hero],
-      w: pct(Math.min(slots[hero].w * 1.55, 29)),
-      h: pct(Math.min(slots[hero].h * 1.35, 42)),
-    };
-  }
-  return slots;
-}
-
-function layoutsForCount(count) {
-  const base = [
-    { id: `grid-${count}`, name: "Grade limpa", slots: autoGrid(count) },
-    { id: `hero-left-${count}`, name: "Destaque esquerda", slots: heroLeft(count) },
-    { id: `hero-right-${count}`, name: "Destaque direita", slots: heroRight(count) },
-    { id: `strip-${count}`, name: "Faixa editorial", slots: editorialStrip(count) },
-    { id: `mosaic-${count}`, name: "Mosaico dinâmico", slots: mosaic(count) },
-  ];
-
-  if (count === 1) base.push({ id: "luxo-1", name: "Respiro luxo", slots: [{ x: 14, y: 10, w: 72, h: 80 }] });
-  if (count === 2) base.push({ id: "editorial-2", name: "Assimétrico", slots: [{ x: 4, y: 9, w: 58, h: 82 }, { x: 66, y: 19, w: 30, h: 62 }] });
-  if (count === 3) base.push({ id: "trip-3", name: "Tríptico", slots: [{ x: 3, y: 8, w: 30, h: 84 }, { x: 35, y: 8, w: 30, h: 84 }, { x: 67, y: 8, w: 30, h: 84 }] });
-  if (count === 4) base.push({ id: "classic-4", name: "Clássico 2x2", slots: [{ x: 3, y: 6, w: 45, h: 42 }, { x: 52, y: 6, w: 45, h: 42 }, { x: 3, y: 52, w: 45, h: 42 }, { x: 52, y: 52, w: 45, h: 42 }] });
-
-  return base;
-}
-
-const layoutsByCount = Object.fromEntries(Array.from({ length: MAX_PHOTOS_PER_SPREAD }, (_, i) => [i + 1, layoutsForCount(i + 1)]));
-
-const demoImages = [
-  "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1504151932400-72d4384f04b3?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1504196606672-aef5c9cefc92?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1502635385003-ee1e6a1a742d?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1496843916299-590492c751f4?auto=format&fit=crop&w=900&q=80"
-];
-
-function makePhotos(urls, prefix = "foto") {
-  return urls.map((src, index) => ({ id: uid(prefix), src, name: `${prefix}-${index + 1}` }));
-}
-
-function createBlankSpread(index = 0) {
-  return {
-    id: uid("spread"),
-    title: `Lâmina ${index + 1}`,
-    targetPhotoCount: 0,
-    layoutVariantIndex: 0,
-    spreadPhotoIds: [],
-    frames: [],
-  };
-}
-
-function framesFromLayout(layout, photoIds, previousFrames = []) {
-  const previousByPhoto = new Map(previousFrames.filter((f) => f.photoId).map((f) => [f.photoId, f]));
-  return layout.slots.map((slot, index) => {
-    const photoId = photoIds[index] || null;
-    const previous = photoId ? previousByPhoto.get(photoId) : null;
-    return {
-      id: uid("frame"),
-      photoId,
-      x: slot.x,
-      y: slot.y,
-      w: slot.w,
-      h: slot.h,
-      z: index + 1,
-      cropX: previous?.cropX || 0,
-      cropY: previous?.cropY || 0,
-      cropScale: previous?.cropScale || 1,
-    };
-  });
-}
-
-function cloneSpread(spread, index) {
-  return {
-    ...spread,
-    id: uid("spread"),
-    title: `Lâmina ${index + 1}`,
-    frames: spread.frames.map((frame) => ({ ...frame, id: uid("frame") })),
-  };
-}
-
-function syncPhotoIds(frames) {
-  return frames.map((frame) => frame.photoId).filter(Boolean);
-}
-
-function getPointerPct(event, element) {
-  const rect = element.getBoundingClientRect();
-  return {
-    x: ((event.clientX - rect.left) / rect.width) * 100,
-    y: ((event.clientY - rect.top) / rect.height) * 100,
-  };
-}
-
-function pointInFrame(point, frame) {
-  return point.x >= frame.x && point.x <= frame.x + frame.w && point.y >= frame.y && point.y <= frame.y + frame.h;
-}
-
-function resizeFrame(frame, handle, dx, dy) {
-  let next = { ...frame };
-  if (handle.includes("e")) next.w = frame.w + dx;
-  if (handle.includes("s")) next.h = frame.h + dy;
-  if (handle.includes("w")) {
-    next.x = frame.x + dx;
-    next.w = frame.w - dx;
-  }
-  if (handle.includes("n")) {
-    next.y = frame.y + dy;
-    next.h = frame.h - dy;
-  }
-  if (next.w < MIN_FRAME_SIZE) {
-    if (handle.includes("w")) next.x = frame.x + frame.w - MIN_FRAME_SIZE;
-    next.w = MIN_FRAME_SIZE;
-  }
-  if (next.h < MIN_FRAME_SIZE) {
-    if (handle.includes("n")) next.y = frame.y + frame.h - MIN_FRAME_SIZE;
-    next.h = MIN_FRAME_SIZE;
-  }
-  return {
-    ...next,
-    x: clamp(next.x, -50, 150),
-    y: clamp(next.y, -50, 150),
-    w: clamp(next.w, MIN_FRAME_SIZE, 150),
-    h: clamp(next.h, MIN_FRAME_SIZE, 150),
-  };
-}
-
-function swapFramePhotos(frames, aId, bId) {
-  const a = frames.find((f) => f.id === aId);
-  const b = frames.find((f) => f.id === bId);
-  if (!a || !b) return frames;
-  return frames.map((frame) => {
-    if (frame.id === aId) return { ...frame, photoId: b.photoId, cropX: b.cropX || 0, cropY: b.cropY || 0, cropScale: b.cropScale || 1 };
-    if (frame.id === bId) return { ...frame, photoId: a.photoId, cropX: a.cropX || 0, cropY: a.cropY || 0, cropScale: a.cropScale || 1 };
-    return frame;
-  });
-}
-
-function Button({ children, onClick, className = "", disabled = false, type = "button" }) {
-  return <button type={type} disabled={disabled} onClick={onClick} className={`btn ${className}`}>{children}</button>;
-}
-
-function Icon({ children }) {
-  return <span className="icon">{children}</span>;
-}
-
-function PhotoImage({ photo, frame, className = "" }) {
-  if (!photo) return <div className={`photo-empty ${className}`}>▧</div>;
-  const scale = frame.cropScale || 1;
-  const x = frame.cropX || 0;
-  const y = frame.cropY || 0;
+function Photo({ src, frame }) {
+  if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
   return (
     <img
-      src={photo.src}
-      alt={photo.name || "Foto"}
+      src={src}
+      alt=""
       draggable="false"
-      className={`photo-img ${className}`}
-      style={{
-        width: `${100 * scale}%`,
-        height: `${100 * scale}%`,
-        left: "50%",
-        top: "50%",
-        transform: `translate(-50%, -50%) translate(${x}%, ${y}%)`,
-      }}
+      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
     />
   );
 }
 
-function Frame({ frame, photo, selected, dropTarget, onSelect, onStartResize, onStartMove, onStartSwap }) {
-  const handles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+function Button({ children, onClick, variant = "primary", disabled = false, title }) {
   return (
-    <div
-      className={`frame ${selected ? "selected" : ""} ${dropTarget ? "drop-target" : ""}`}
-      style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%`, zIndex: selected ? 20 : frame.z }}
-    >
-      <button className="frame-photo" onClick={onSelect} onPointerDown={onStartMove} title="Clique para selecionar. Arraste para mover o quadro.">
-        <PhotoImage photo={photo} frame={frame} />
-      </button>
-      <button className="swap-btn" onPointerDown={onStartSwap} title="Arraste para outra foto para trocar">↔</button>
-      {selected && handles.map((handle) => (
-        <button
-          key={handle}
-          className={`resize-handle handle-${handle}`}
-          onPointerDown={(event) => onStartResize(handle, event)}
-          title="Arraste para redimensionar"
-        />
-      ))}
-    </div>
-  );
-}
-
-function CropPanel({ frame, photo, onChange, onCenter, onRemove, onUploadNew }) {
-  const stageRef = useRef(null);
-  const dragRef = useRef(null);
-
-  useEffect(() => {
-    const onMove = (event) => {
-      const drag = dragRef.current;
-      const rect = stageRef.current?.getBoundingClientRect();
-      if (!drag || !rect) return;
-      const dx = ((event.clientX - drag.startX) / rect.width) * 100;
-      const dy = ((event.clientY - drag.startY) / rect.height) * 100;
-      onChange({ cropX: clamp(drag.cropX + dx, -80, 80), cropY: clamp(drag.cropY + dy, -80, 80) });
-    };
-    const onUp = () => { dragRef.current = null; };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [onChange]);
-
-  if (!frame) {
-    return (
-      <div className="empty-panel">
-        Clique em uma foto da lâmina para ajustar enquadramento, zoom e posição.
-      </div>
-    );
-  }
-
-  const aspect = Math.max(frame.w / Math.max(frame.h, 1), 0.25);
-
-  return (
-    <div className="crop-panel">
-      <div className="panel-title">Enquadramento</div>
-      <div className="panel-subtitle">A imagem aparece inteira. Arraste dentro da caixa para reposicionar sem quebrar o layout.</div>
-      <div
-        ref={stageRef}
-        className="crop-stage"
-        onPointerDown={(event) => {
-          event.preventDefault();
-          dragRef.current = { startX: event.clientX, startY: event.clientY, cropX: frame.cropX || 0, cropY: frame.cropY || 0 };
-        }}
-      >
-        {photo ? (
-          <img
-            src={photo.src}
-            alt="Prévia da foto inteira"
-            draggable="false"
-            className="crop-full-img"
-            style={{ transform: `translate(-50%, -50%) translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
-          />
-        ) : <div className="photo-empty">▧</div>}
-        <div className="crop-mask" style={aspect >= 1 ? { width: "82%", aspectRatio: `${aspect}` } : { height: "82%", aspectRatio: `${aspect}` }}>
-          <span>área visível</span>
-        </div>
-      </div>
-      <label className="range-label">Zoom: {(frame.cropScale || 1).toFixed(2)}x</label>
-      <input
-        className="range"
-        type="range"
-        min="0.6"
-        max="3"
-        step="0.01"
-        value={frame.cropScale || 1}
-        onChange={(event) => onChange({ cropScale: Number(event.target.value) })}
-      />
-      <div className="panel-actions two">
-        <Button onClick={onCenter}>Centralizar</Button>
-        <Button onClick={onUploadNew}>Trocar foto</Button>
-        <Button onClick={onRemove} className="danger">Remover quadro</Button>
-      </div>
-    </div>
-  );
-}
-
-function LayoutPreview({ layout, active, onClick }) {
-  return (
-    <button className={`layout-card ${active ? "active" : ""}`} onClick={onClick}>
-      <div className="layout-thumb">
-        <div className="center-line" />
-        {layout.slots.map((slot, index) => (
-          <span key={index} style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }} />
-        ))}
-      </div>
-      <strong>{layout.name}</strong>
-    </button>
-  );
-}
-
-function SpreadMini({ spread, index, active, photoMap, onClick }) {
-  return (
-    <button className={`spread-mini ${active ? "active" : ""}`} onClick={onClick}>
-      <div className="spread-mini-canvas">
-        <div className="center-line" />
-        {spread.frames.map((frame) => {
-          const photo = photoMap.get(frame.photoId);
-          return <div key={frame.id} className="mini-frame" style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}>{photo ? <img src={photo.src} alt="" /> : null}</div>;
-        })}
-        {!spread.frames.length && <div className="mini-empty" />}
-      </div>
-      <div className="mini-label"><span>Lâmina {index + 1}</span><b>{spread.frames.length}</b></div>
+    <button type="button" className={`btn ${variant}`} onClick={onClick} disabled={disabled} title={title}>
+      {children}
     </button>
   );
 }
 
 export default function App() {
-  const [albumName, setAlbumName] = useState("Álbum Picmimos 20x20");
-  const [photoLibrary, setPhotoLibrary] = useState([]);
-  const [spreads, setSpreads] = useState([createBlankSpread(0)]);
-  const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
+  const [formatId, setFormatId] = useState("20x20");
+  const [pageCount, setPageCount] = useState(20);
+  const [textureId, setTextureId] = useState("champagne");
+  const [photos, setPhotos] = useState([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
+  const [cover, setCover] = useState({ photoId: null, cropScale: 1, cropX: 0, cropY: 0, texts: [] });
+  const [spreads, setSpreads] = useState(() => buildBlankSpreads(20));
+  const [active, setActive] = useState({ type: "cover", index: 0 });
   const [selectedFrameId, setSelectedFrameId] = useState(null);
-  const [lastClickedPhotoIndex, setLastClickedPhotoIndex] = useState(null);
-  const [dragPhotoIds, setDragPhotoIds] = useState([]);
-  const [interaction, setInteraction] = useState(null);
-  const [swap, setSwap] = useState(null);
-  const [dropTargetId, setDropTargetId] = useState(null);
-  const [rightTab, setRightTab] = useState("album");
-  const [bottomFilter, setBottomFilter] = useState("all");
+  const [showSafety, setShowSafety] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [savedAt, setSavedAt] = useState(null);
+  const fileInputRef = useRef(null);
+  const stageRef = useRef(null);
 
-  const spreadRef = useRef(null);
-  const uploadRef = useRef(null);
-  const addRef = useRef(null);
-  const replaceSelectedRef = useRef(null);
+  const format = useMemo(() => FORMATS.find((item) => item.id === formatId) || FORMATS[3], [formatId]);
+  const texture = useMemo(() => TEXTURES.find((item) => item.id === textureId) || TEXTURES[0], [textureId]);
+  const photoMap = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
+  const currentSpread = active.type === "spread" ? spreads[active.index] : null;
+  const selectedFrame = currentSpread?.frames.find((frame) => frame.id === selectedFrameId) || null;
+  const usedPhotoIds = useMemo(() => {
+    const used = new Set();
+    if (cover.photoId) used.add(cover.photoId);
+    spreads.forEach((spread) => spread.frames.forEach((frame) => frame.photoId && used.add(frame.photoId)));
+    return used;
+  }, [cover.photoId, spreads]);
 
-  const currentSpread = spreads[currentSpreadIndex] || spreads[0];
-  const frames = currentSpread.frames;
-  const photoMap = useMemo(() => new Map(photoLibrary.map((photo) => [photo.id, photo])), [photoLibrary]);
-  const usedPhotoIds = useMemo(() => new Set(spreads.flatMap((spread) => spread.frames.map((frame) => frame.photoId).filter(Boolean))), [spreads]);
-  const selectedFrame = frames.find((frame) => frame.id === selectedFrameId) || null;
-  const selectedFramePhoto = selectedFrame?.photoId ? photoMap.get(selectedFrame.photoId) : null;
-  const layoutOptions = currentSpread.targetPhotoCount ? layoutsByCount[currentSpread.targetPhotoCount] || [] : [];
+  const spineCm = getSpineCm(pageCount);
+  const coverTotalW = format.closedW * 2 + spineCm;
+  const coverAspect = coverTotalW / format.closedH;
+  const spreadAspect = format.spreadW / format.spreadH;
+  const activeAspect = active.type === "cover" ? coverAspect : spreadAspect;
 
-  const updateCurrentSpread = (updater) => {
-    setSpreads((current) => current.map((spread, index) => {
-      if (index !== currentSpreadIndex) return spread;
-      return typeof updater === "function" ? updater(spread) : { ...spread, ...updater };
-    }));
-  };
-
-  const renameSpreads = (list) => list.map((spread, index) => ({ ...spread, title: `Lâmina ${index + 1}` }));
-
-  const buildSpread = (photoIds, variantIndex = 0, preserveFrames = frames) => {
-    const cleanIds = unique(photoIds);
-    if (!cleanIds.length) return;
-    const layouts = layoutsByCount[cleanIds.length] || layoutsByCount[1];
-    const safeIndex = ((variantIndex % layouts.length) + layouts.length) % layouts.length;
-    const nextFrames = framesFromLayout(layouts[safeIndex], cleanIds, preserveFrames);
-    updateCurrentSpread({
-      targetPhotoCount: cleanIds.length,
-      layoutVariantIndex: safeIndex,
-      spreadPhotoIds: cleanIds,
-      frames: nextFrames,
+  function handlePagesChange(value) {
+    const next = Number(value);
+    setPageCount(next);
+    setSpreads((old) => {
+      const needed = next / 2;
+      if (old.length === needed) return old;
+      if (old.length > needed) return old.slice(0, needed).map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` }));
+      const extra = Array.from({ length: needed - old.length }, (_, i) => createBlankSpread(old.length + i));
+      return [...old, ...extra];
     });
-    setSelectedFrameId(nextFrames[0]?.id || null);
-    setRightTab("photo");
-  };
+    if (active.type === "spread" && active.index >= next / 2) setActive({ type: "spread", index: 0 });
+  }
 
-  const changeLayout = (delta) => {
-    if (!currentSpread.spreadPhotoIds.length) return;
-    buildSpread(currentSpread.spreadPhotoIds, currentSpread.layoutVariantIndex + delta, frames);
-  };
-
-  useEffect(() => {
-    const onKey = (event) => {
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
-      if (event.key === "ArrowRight") changeLayout(1);
-      if (event.key === "ArrowLeft") changeLayout(-1);
-      if (event.key === "Delete" || event.key === "Backspace") {
-        if (selectedFrameId) removeSelectedFrame();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
-  useEffect(() => {
-    if (!interaction) return;
-    const onMove = (event) => {
-      const rect = spreadRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const dx = ((event.clientX - interaction.startX) / rect.width) * 100;
-      const dy = ((event.clientY - interaction.startY) / rect.height) * 100;
-      if (interaction.type === "resize") {
-        const next = resizeFrame(interaction.frame, interaction.handle, dx, dy);
-        updateCurrentSpread((spread) => ({
-          ...spread,
-          frames: spread.frames.map((frame) => frame.id === interaction.frame.id ? next : frame),
-        }));
-      }
-      if (interaction.type === "move") {
-        const next = {
-          ...interaction.frame,
-          x: pct(clamp(interaction.frame.x + dx, -50, 150)),
-          y: pct(clamp(interaction.frame.y + dy, -50, 150)),
-        };
-        updateCurrentSpread((spread) => ({
-          ...spread,
-          frames: spread.frames.map((frame) => frame.id === interaction.frame.id ? next : frame),
-        }));
-      }
-    };
-    const onUp = () => setInteraction(null);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [interaction]);
-
-  useEffect(() => {
-    if (!swap) return;
-    const onMove = (event) => {
-      const element = spreadRef.current;
-      if (!element) return;
-      const point = getPointerPct(event, element);
-      const target = frames.filter((frame) => frame.id !== swap.sourceId && pointInFrame(point, frame)).sort((a, b) => (b.z || 0) - (a.z || 0))[0];
-      setDropTargetId(target?.id || null);
-      setSwap((current) => current ? { ...current, x: event.clientX, y: event.clientY } : null);
-    };
-    const onUp = (event) => {
-      const element = spreadRef.current;
-      if (element) {
-        const point = getPointerPct(event, element);
-        const target = frames.filter((frame) => frame.id !== swap.sourceId && pointInFrame(point, frame)).sort((a, b) => (b.z || 0) - (a.z || 0))[0];
-        if (target) {
-          const swapped = swapFramePhotos(frames, swap.sourceId, target.id);
-          updateCurrentSpread({ frames: swapped, spreadPhotoIds: syncPhotoIds(swapped) });
-          setSelectedFrameId(target.id);
-        }
-      }
-      setSwap(null);
-      setDropTargetId(null);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [swap, frames]);
-
-  const readFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter((file) => file.type?.startsWith("image/"));
-    if (!files.length) return [];
-    return Promise.all(files.map((file) => new Promise((resolve, reject) => {
+  async function importFiles(files) {
+    const list = Array.from(files || []).filter((file) => file.type?.startsWith("image/"));
+    if (!list.length) return;
+    const loaded = await Promise.all(list.map((file) => new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve({ id: uid("user"), src: reader.result, name: file.name });
+      reader.onload = () => resolve({ id: uid("photo"), src: reader.result, name: file.name });
       reader.onerror = reject;
       reader.readAsDataURL(file);
     })));
-  };
+    setPhotos((prev) => [...prev, ...loaded]);
+    setSelectedPhotoIds(loaded.slice(0, 8).map((p) => p.id));
+  }
 
-  const addPhotos = async (files) => {
-    const photos = await readFiles(files);
-    if (!photos.length) return;
-    setPhotoLibrary((current) => [...current, ...photos]);
-    if (!selectedPhotoIds.length) setSelectedPhotoIds(photos.slice(0, Math.min(photos.length, 4)).map((photo) => photo.id));
-  };
+  function loadDemo() {
+    const demo = makeDemoPhotos();
+    setPhotos(demo);
+    setSelectedPhotoIds(demo.slice(0, 6).map((p) => p.id));
+  }
 
-  const replaceSelectedFramePhoto = async (files) => {
-    const photos = await readFiles(files);
-    if (!photos.length || !selectedFrameId) return;
-    setPhotoLibrary((current) => [...current, ...photos]);
-    updateCurrentSpread((spread) => {
-      const nextFrames = spread.frames.map((frame) => frame.id === selectedFrameId ? { ...frame, photoId: photos[0].id, cropX: 0, cropY: 0, cropScale: 1 } : frame);
-      return { ...spread, frames: nextFrames, spreadPhotoIds: syncPhotoIds(nextFrames) };
-    });
-  };
-
-  const loadDemo = () => {
-    const demos = makePhotos(demoImages, "demo");
-    setPhotoLibrary(demos);
-    setSelectedPhotoIds(demos.slice(0, 4).map((photo) => photo.id));
-  };
-
-  const photoClick = (photoId, index, event) => {
-    if (event.shiftKey && lastClickedPhotoIndex !== null) {
-      const start = Math.min(lastClickedPhotoIndex, index);
-      const end = Math.max(lastClickedPhotoIndex, index);
-      setSelectedPhotoIds((current) => unique([...current, ...photoLibrary.slice(start, end + 1).map((photo) => photo.id)]));
-    } else if (event.altKey || event.ctrlKey || event.metaKey) {
-      setSelectedPhotoIds((current) => current.includes(photoId) ? current.filter((id) => id !== photoId) : unique([...current, photoId]));
-    } else {
-      setSelectedPhotoIds([photoId]);
+  function togglePhoto(photoId, event) {
+    if (event?.shiftKey && selectedPhotoIds.length) {
+      const lastId = selectedPhotoIds[selectedPhotoIds.length - 1];
+      const start = photos.findIndex((p) => p.id === lastId);
+      const end = photos.findIndex((p) => p.id === photoId);
+      if (start >= 0 && end >= 0) {
+        const [a, b] = [Math.min(start, end), Math.max(start, end)];
+        const range = photos.slice(a, b + 1).map((p) => p.id);
+        setSelectedPhotoIds(Array.from(new Set([...selectedPhotoIds, ...range])).slice(0, 20));
+        return;
+      }
     }
-    setLastClickedPhotoIndex(index);
-  };
-
-  const addBlankSpread = () => {
-    setSpreads((current) => renameSpreads([...current.slice(0, currentSpreadIndex + 1), createBlankSpread(currentSpreadIndex + 1), ...current.slice(currentSpreadIndex + 1)]));
-    setCurrentSpreadIndex((index) => index + 1);
-    setSelectedFrameId(null);
-    setRightTab("album");
-  };
-
-  const duplicateCurrentSpread = () => {
-    setSpreads((current) => renameSpreads([...current.slice(0, currentSpreadIndex + 1), cloneSpread(currentSpread, currentSpreadIndex + 1), ...current.slice(currentSpreadIndex + 1)]));
-    setCurrentSpreadIndex((index) => index + 1);
-  };
-
-  const deleteCurrentSpread = () => {
-    if (spreads.length === 1) {
-      setSpreads([createBlankSpread(0)]);
-      setSelectedFrameId(null);
+    if (event?.metaKey || event?.ctrlKey || event?.altKey) {
+      setSelectedPhotoIds((prev) => prev.includes(photoId) ? prev.filter((id) => id !== photoId) : [...prev, photoId].slice(0, 20));
       return;
     }
-    setSpreads((current) => renameSpreads(current.filter((_, index) => index !== currentSpreadIndex)));
-    setCurrentSpreadIndex((index) => Math.max(0, index - 1));
-    setSelectedFrameId(null);
-  };
+    setSelectedPhotoIds((prev) => prev.includes(photoId) && prev.length === 1 ? [] : [photoId]);
+  }
 
-  const removeSelectedFrame = () => {
-    if (!selectedFrameId) return;
-    updateCurrentSpread((spread) => {
-      const nextFrames = spread.frames.filter((frame) => frame.id !== selectedFrameId);
-      return {
-        ...spread,
-        frames: nextFrames,
-        spreadPhotoIds: syncPhotoIds(nextFrames),
-        targetPhotoCount: nextFrames.length,
-        layoutVariantIndex: 0,
-      };
-    });
-    setSelectedFrameId(null);
-  };
+  function applySelectedToCover() {
+    const id = selectedPhotoIds[0];
+    if (!id) return alert("Selecione uma foto no rodapé primeiro.");
+    setCover((prev) => ({ ...prev, photoId: id, cropScale: 1, cropX: 0, cropY: 0 }));
+    setActive({ type: "cover", index: 0 });
+  }
 
-  const updateSelectedFrame = (patch) => {
-    if (!selectedFrameId) return;
-    updateCurrentSpread((spread) => ({
-      ...spread,
-      frames: spread.frames.map((frame) => frame.id === selectedFrameId ? { ...frame, ...patch } : frame),
+  function autoBuildCurrentSpread() {
+    if (active.type !== "spread") {
+      alert("Clique em uma página do miolo no rodapé para montar a lâmina.");
+      return;
+    }
+    let ids = selectedPhotoIds.slice(0, 20);
+    if (!ids.length) {
+      ids = photos.filter((p) => !usedPhotoIds.has(p.id)).slice(0, 4).map((p) => p.id);
+    }
+    if (!ids.length) return alert("Importe ou selecione fotos primeiro.");
+    setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
+  }
+
+  function changeLayout(direction) {
+    if (active.type !== "spread") return;
+    setSpreads((prev) => prev.map((spread, index) => {
+      if (index !== active.index || !spread.frames.length) return spread;
+      const nextVariant = (spread.layoutVariant || 0) + direction;
+      const photoIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
+      return { ...spread, layoutVariant: nextVariant, frames: createFrames(photoIds, ((nextVariant % 4) + 4) % 4) };
     }));
-  };
+  }
 
-  const filteredPhotos = photoLibrary.filter((photo) => {
-    if (bottomFilter === "selected") return selectedPhotoIds.includes(photo.id);
-    if (bottomFilter === "unused") return !usedPhotoIds.has(photo.id);
-    return true;
-  });
+  function insertBlankSpread() {
+    setSpreads((prev) => {
+      const insertAt = active.type === "spread" ? active.index + 1 : 0;
+      const next = [...prev.slice(0, insertAt), createBlankSpread(insertAt), ...prev.slice(insertAt)];
+      return next.map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` }));
+    });
+    setPageCount((p) => Math.min(MAX_PAGES, p + 2));
+  }
+
+  function duplicateSpread() {
+    if (active.type !== "spread") return alert("Escolha uma página do miolo para duplicar.");
+    setSpreads((prev) => {
+      const original = prev[active.index];
+      const copy = {
+        ...original,
+        id: uid("spread"),
+        frames: original.frames.map((frame) => ({ ...frame, id: uid("frame") })),
+        texts: original.texts.map((text) => ({ ...text, id: uid("text") })),
+      };
+      const next = [...prev.slice(0, active.index + 1), copy, ...prev.slice(active.index + 1)];
+      return next.map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` }));
+    });
+    setPageCount((p) => Math.min(MAX_PAGES, p + 2));
+  }
+
+  function removeSpread() {
+    if (active.type !== "spread") return alert("A capa não pode ser removida.");
+    if (spreads.length <= MIN_PAGES / 2) return alert("O produto precisa manter pelo menos 20 páginas.");
+    setSpreads((prev) => prev.filter((_, index) => index !== active.index).map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` })));
+    setPageCount((p) => Math.max(MIN_PAGES, p - 2));
+    setActive({ type: "spread", index: Math.max(0, active.index - 1) });
+  }
+
+  function addText() {
+    const text = { id: uid("text"), value: "Seu texto aqui", x: 50, y: 50, size: 24, color: "#ffffff" };
+    if (active.type === "cover") {
+      setCover((prev) => ({ ...prev, texts: [...prev.texts, text] }));
+    } else {
+      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, texts: [...spread.texts, { ...text, color: "#222222" }] } : spread));
+    }
+  }
+
+  function clearActive() {
+    if (active.type === "cover") {
+      setCover((prev) => ({ ...prev, photoId: null, cropScale: 1, cropX: 0, cropY: 0, texts: [] }));
+    } else {
+      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: [], texts: [] } : spread));
+    }
+  }
+
+  function updateCoverCrop(patch) {
+    setCover((prev) => ({ ...prev, ...patch }));
+  }
+
+  function updateFrameCrop(patch) {
+    if (!selectedFrame) return;
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== active.index) return spread;
+      return { ...spread, frames: spread.frames.map((frame) => frame.id === selectedFrame.id ? { ...frame, ...patch } : frame) };
+    }));
+  }
+
+  function handleDrop(event) {
+    event.preventDefault();
+    const photoId = event.dataTransfer.getData("photo/id");
+    if (!photoId) return;
+    if (active.type === "cover") {
+      setCover((prev) => ({ ...prev, photoId, cropScale: 1, cropX: 0, cropY: 0 }));
+    } else {
+      const ids = Array.from(new Set([photoId, ...selectedPhotoIds])).slice(0, 20);
+      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
+    }
+  }
+
+  function saveProject() {
+    const payload = getProjectPayload();
+    localStorage.setItem("picmimos-diagramador-v4", JSON.stringify(payload));
+    setSavedAt(new Date());
+    setModal({ type: "saved" });
+  }
+
+  function getProjectPayload() {
+    return {
+      version: "V4",
+      product: "Meia Capa Fotográfica",
+      format: format.label,
+      pages: pageCount,
+      laminas: pageCount / 2,
+      spineCm,
+      texture: texture.label,
+      safetyMarginCm: SAFETY_MARGIN_CM,
+      production: {
+        output: "JPG limpo",
+        dpi: 300,
+        paper: "Fuji com UV Fosco",
+        cover: "Somente frente fotográfica; verso/lombada revestimento",
+      },
+      cover,
+      spreads,
+      photosCount: photos.length,
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  async function makePreview() {
+    try {
+      const node = stageRef.current;
+      const dataUrl = node ? await htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: "#f6f2eb" }) : null;
+      setModal({ type: "preview", dataUrl });
+    } catch (error) {
+      console.error(error);
+      setModal({ type: "preview", dataUrl: null });
+    }
+  }
+
+  function finalizeProject() {
+    const emptySpreads = spreads.map((spread, index) => ({ spread, index })).filter(({ spread }) => !spread.frames.length);
+    const problems = [];
+    if (!cover.photoId) problems.push("A capa frontal ainda não tem foto.");
+    if (emptySpreads.length) problems.push(`${emptySpreads.length} lâmina(s) do miolo estão vazias.`);
+    setModal({ type: "finalize", problems, emptySpreads });
+  }
+
+  function simulatedExport() {
+    const files = [
+      "00-FICHA-PRODUCAO.html",
+      "00-DADOS-PEDIDO.json",
+      "00-PREVIEW.jpg",
+      "01-CAPA-FRENTE.jpg",
+      ...spreads.map((_, index) => `${String(index + 2).padStart(2, "0")}-LAMINA-${String(index + 1).padStart(2, "0")}.jpg`),
+    ];
+    setModal({ type: "export", files });
+  }
+
+  const activeLabel = active.type === "cover" ? "Capa" : currentSpread?.name;
+  const currentPhotoForPanel = active.type === "cover" ? photoMap.get(cover.photoId) : selectedFrame?.photoId ? photoMap.get(selectedFrame.photoId) : null;
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <div className="mark">P</div>
+          <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos</strong>
-            <span>Álbum aberto 40×20 · páginas 20×20</span>
+            <strong>Diagramador Picmimos V4</strong>
+            <span>Meia Capa Fotográfica · visual/funcional</span>
           </div>
         </div>
-        <input className="album-input" value={albumName} onChange={(event) => setAlbumName(event.target.value)} />
         <div className="top-actions">
-          <Button onClick={addBlankSpread}>+ Inserir lâmina</Button>
-          <Button onClick={duplicateCurrentSpread}>Duplicar</Button>
-          <Button onClick={() => alert("Exportação será a próxima etapa do projeto.")}>Exportar</Button>
+          <Button variant="secondary" onClick={saveProject}>Salvar projeto</Button>
+          <Button variant="secondary" onClick={makePreview}>Pré-visualizar</Button>
+          <Button variant="warning" onClick={finalizeProject}>Finalizar</Button>
         </div>
       </header>
 
-      <div className="workspace">
-        <aside className="tools">
-          <button className="tool active">↖</button>
-          <button className="tool">✋</button>
-          <button className="tool">T</button>
-          <button className="tool">□</button>
-          <button className="tool">⌕</button>
-        </aside>
+      <aside className="left-panel">
+        <section className="panel-card">
+          <h3>Produto</h3>
+          <label>Formato fechado</label>
+          <select value={formatId} onChange={(e) => setFormatId(e.target.value)}>
+            {FORMATS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
 
-        <main className="stage-wrap">
-          <div className="ruler">0&nbsp;&nbsp;&nbsp;10&nbsp;&nbsp;&nbsp;20&nbsp;&nbsp;&nbsp;30&nbsp;&nbsp;&nbsp;40&nbsp;&nbsp;&nbsp;50&nbsp;&nbsp;&nbsp;60&nbsp;&nbsp;&nbsp;70&nbsp;&nbsp;&nbsp;80&nbsp;&nbsp;&nbsp;90&nbsp;&nbsp;&nbsp;100</div>
-          <div className="stage-center">
-            <div className="stage-head">
-              <span>Página esquerda 20×20</span>
-              <div className="layout-actions">
-                <button onClick={() => changeLayout(-1)} disabled={!currentSpread.spreadPhotoIds.length}>‹ Layout</button>
-                <button onClick={() => buildSpread(selectedPhotoIds, 0)} disabled={!selectedPhotoIds.length}>⚡ Auto Build {selectedPhotoIds.length ? `(${selectedPhotoIds.length})` : ""}</button>
-                <button onClick={() => changeLayout(1)} disabled={!currentSpread.spreadPhotoIds.length}>Layout ›</button>
-              </div>
-              <span>Página direita 20×20</span>
-            </div>
+          <label>Quantidade de páginas</label>
+          <select value={pageCount} onChange={(e) => handlePagesChange(e.target.value)}>
+            {Array.from({ length: (MAX_PAGES - MIN_PAGES) / 2 + 1 }, (_, i) => MIN_PAGES + i * 2).map((p) => <option key={p} value={p}>{p} páginas ({p / 2} lâminas)</option>)}
+          </select>
 
-            <div
-              ref={spreadRef}
-              className={`spread-canvas ${dragPhotoIds.length ? "drop-ready" : ""}`}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                const ids = dragPhotoIds.length ? dragPhotoIds : selectedPhotoIds;
-                if (ids.length) buildSpread(ids, 0);
-                setDragPhotoIds([]);
-              }}
-              onClick={() => setSelectedFrameId(null)}
-            >
-              <div className="safe-area" />
-              <div className="gutter" />
-              {!frames.length && (
-                <div className="blank-message">
-                  <strong>Lâmina em branco</strong>
-                  <span>Importe fotos no rodapé, selecione e clique em Auto Build ou arraste para cá.</span>
-                </div>
-              )}
-              {frames.map((frame) => (
-                <Frame
-                  key={frame.id}
-                  frame={frame}
-                  photo={frame.photoId ? photoMap.get(frame.photoId) : null}
-                  selected={selectedFrameId === frame.id}
-                  dropTarget={dropTargetId === frame.id}
-                  onSelect={(event) => {
-                    event.stopPropagation();
-                    setSelectedFrameId(frame.id);
-                    setRightTab("photo");
-                  }}
-                  onStartMove={(event) => {
-                    event.stopPropagation();
-                    if (event.target.classList.contains("resize-handle")) return;
-                    setSelectedFrameId(frame.id);
-                    setRightTab("photo");
-                    setInteraction({ type: "move", frame, startX: event.clientX, startY: event.clientY });
-                  }}
-                  onStartResize={(handle, event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setSelectedFrameId(frame.id);
-                    setRightTab("photo");
-                    setInteraction({ type: "resize", handle, frame, startX: event.clientX, startY: event.clientY });
-                  }}
-                  onStartSwap={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setSelectedFrameId(frame.id);
-                    setRightTab("photo");
-                    setSwap({ sourceId: frame.id, x: event.clientX, y: event.clientY });
-                  }}
-                />
-              ))}
-              {dragPhotoIds.length > 0 && <div className="drop-overlay">Solte para montar {dragPhotoIds.length} foto{dragPhotoIds.length > 1 ? "s" : ""}</div>}
-              {swap && <div className="swap-float" style={{ left: swap.x + 14, top: swap.y + 14 }}>↔ solte em outra foto</div>}
-            </div>
+          <label>Textura do verso/lombada</label>
+          <select value={textureId} onChange={(e) => setTextureId(e.target.value)}>
+            {TEXTURES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+
+          <div className="spec-grid">
+            <div><span>Miolo</span><strong>{format.spreadW} x {format.spreadH} cm</strong></div>
+            <div><span>Lombada</span><strong>{(spineCm * 10).toFixed(0)} mm</strong></div>
+            <div><span>Refilo</span><strong>3 mm total</strong></div>
+            <div><span>Saída</span><strong>JPG limpo</strong></div>
           </div>
-        </main>
+        </section>
 
-        <aside className="right-panel">
-          <div className="tabs">
-            <button className={rightTab === "album" ? "active" : ""} onClick={() => setRightTab("album")}>Álbum</button>
-            <button className={rightTab === "photo" ? "active" : ""} onClick={() => setRightTab("photo")}>Foto</button>
+        <section className="panel-card">
+          <h3>Fotos</h3>
+          <div className="button-grid">
+            <Button onClick={() => fileInputRef.current?.click()}>Importar fotos</Button>
+            <Button variant="secondary" onClick={loadDemo}>Fotos demo</Button>
           </div>
+          <Button variant="ghost" onClick={() => { setPhotos([]); setSelectedPhotoIds([]); }}>Limpar biblioteca</Button>
+          <p className="hint">Clique para selecionar. Shift seleciona intervalo. Ctrl/Alt adiciona. Arraste para capa ou lâmina.</p>
+        </section>
+      </aside>
 
-          {rightTab === "photo" ? (
-            <CropPanel
-              frame={selectedFrame}
-              photo={selectedFramePhoto}
-              onChange={updateSelectedFrame}
-              onCenter={() => updateSelectedFrame({ cropX: 0, cropY: 0, cropScale: 1 })}
-              onRemove={removeSelectedFrame}
-              onUploadNew={() => replaceSelectedRef.current?.click()}
-            />
+      <main className="workspace">
+        <div className="workspace-toolbar">
+          <div>
+            <strong>{activeLabel}</strong>
+            <span>{active.type === "cover" ? "Frente editável + verso/lombada texturizados" : `${format.spreadW} x ${format.spreadH} cm · Fuji UV Fosco`}</span>
+          </div>
+          <div className="toolbar-actions">
+            <Button variant="secondary" onClick={active.type === "cover" ? applySelectedToCover : autoBuildCurrentSpread}>{active.type === "cover" ? "Usar foto na capa" : "Montar automático"}</Button>
+            <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>
+            <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>
+            <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Margem 0,3 cm</Button>
+            <Button variant="secondary" onClick={addText}>Texto</Button>
+            <Button variant="danger" onClick={clearActive}>Limpar</Button>
+          </div>
+        </div>
+
+        <div className="stage-holder" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
+          <div ref={stageRef} className={`stage ${active.type}`} style={{ aspectRatio: activeAspect }}>
+            {active.type === "cover" ? (
+              <CoverStage cover={cover} photoMap={photoMap} texture={texture} format={format} spineCm={spineCm} showSafety={showSafety} />
+            ) : (
+              <SpreadStage spread={currentSpread} photoMap={photoMap} showSafety={showSafety} onSelectFrame={setSelectedFrameId} selectedFrameId={selectedFrameId} />
+            )}
+          </div>
+        </div>
+      </main>
+
+      <aside className="right-panel">
+        <section className="panel-card">
+          <h3>Ajustes</h3>
+          {active.type === "cover" ? (
+            <CropControls label="Foto da capa" photo={currentPhotoForPanel} target={cover} onChange={updateCoverCrop} />
+          ) : selectedFrame ? (
+            <CropControls label="Foto selecionada" photo={currentPhotoForPanel} target={selectedFrame} onChange={updateFrameCrop} />
           ) : (
-            <div className="album-panel">
-              <section className="panel-block">
-                <h3>Informações</h3>
-                <div className="stat"><span>Lâminas</span><b>{spreads.length}</b></div>
-                <div className="stat"><span>Páginas</span><b>{spreads.length * 2}</b></div>
-                <div className="stat"><span>Fotos carregadas</span><b>{photoLibrary.length}</b></div>
-                <div className="stat"><span>Fotos usadas</span><b>{usedPhotoIds.size}</b></div>
-              </section>
-
-              <section className="panel-block">
-                <h3>Lâminas</h3>
-                <div className="spread-list">
-                  {spreads.map((spread, index) => (
-                    <SpreadMini key={spread.id} spread={spread} index={index} active={index === currentSpreadIndex} photoMap={photoMap} onClick={() => { setCurrentSpreadIndex(index); setSelectedFrameId(null); }} />
-                  ))}
-                </div>
-                <div className="panel-actions two">
-                  <Button onClick={addBlankSpread}>Inserir</Button>
-                  <Button onClick={deleteCurrentSpread} className="danger">Remover</Button>
-                </div>
-              </section>
-
-              <section className="panel-block">
-                <h3>Layouts da lâmina</h3>
-                {!layoutOptions.length ? <p className="muted">Monte a lâmina com fotos para ver variações.</p> : layoutOptions.map((layout, index) => (
-                  <LayoutPreview key={layout.id} layout={layout} active={index === currentSpread.layoutVariantIndex} onClick={() => buildSpread(currentSpread.spreadPhotoIds, index, frames)} />
-                ))}
-              </section>
-            </div>
+            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom e enquadramento.</div>
           )}
-        </aside>
+        </section>
+
+        <section className="panel-card">
+          <h3>Páginas</h3>
+          <div className="button-grid">
+            <Button variant="secondary" onClick={insertBlankSpread}>Inserir</Button>
+            <Button variant="secondary" onClick={duplicateSpread}>Duplicar</Button>
+            <Button variant="danger" onClick={removeSpread}>Remover</Button>
+            <Button variant="secondary" onClick={simulatedExport}>Exportação</Button>
+          </div>
+          <p className="hint">A exportação real em JPG 300 DPI será feita depois que o fluxo visual estiver aprovado.</p>
+        </section>
+
+        <section className="panel-card">
+          <h3>Status</h3>
+          <ul className="status-list">
+            <li><span>Capa com foto</span><strong>{cover.photoId ? "Sim" : "Não"}</strong></li>
+            <li><span>Lâminas vazias</span><strong>{spreads.filter((s) => !s.frames.length).length}</strong></li>
+            <li><span>Fotos usadas</span><strong>{usedPhotoIds.size}/{photos.length}</strong></li>
+            <li><span>Salvo</span><strong>{savedAt ? savedAt.toLocaleTimeString("pt-BR") : "Ainda não"}</strong></li>
+          </ul>
+        </section>
+      </aside>
+
+      <section className="filmstrip">
+        <div className="spread-strip">
+          <button className={`thumb-nav ${active.type === "cover" ? "on" : ""}`} onClick={() => setActive({ type: "cover", index: 0 })}>
+            <span>Capa</span>
+            <small>{cover.photoId ? "ok" : "vazia"}</small>
+          </button>
+          {spreads.map((spread, index) => (
+            <button key={spread.id} className={`thumb-nav ${active.type === "spread" && active.index === index ? "on" : ""}`} onClick={() => { setActive({ type: "spread", index }); setSelectedFrameId(null); }}>
+              <span>{spread.name}</span>
+              <small>{spread.frames.length ? `${spread.frames.length} foto(s)` : "em branco"}</small>
+            </button>
+          ))}
+        </div>
+        <div className="photo-strip">
+          {photos.length ? photos.map((photo, index) => (
+            <button
+              key={photo.id}
+              className={`photo-tile ${selectedPhotoIds.includes(photo.id) ? "selected" : ""} ${usedPhotoIds.has(photo.id) ? "used" : ""}`}
+              onClick={(event) => togglePhoto(photo.id, event)}
+              draggable
+              onDragStart={(event) => event.dataTransfer.setData("photo/id", photo.id)}
+              title={photo.name}
+            >
+              <img src={photo.src} alt="" />
+              <span className="photo-index">{index + 1}</span>
+              {selectedPhotoIds.includes(photo.id) && <b>{selectedPhotoIds.indexOf(photo.id) + 1}</b>}
+              {usedPhotoIds.has(photo.id) && <small>usada</small>}
+            </button>
+          )) : <div className="filmstrip-empty">Importe fotos ou clique em “Fotos demo”.</div>}
+        </div>
+      </section>
+
+      <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => importFiles(e.target.files)} />
+      {modal && <Modal modal={modal} onClose={() => setModal(null)} onExport={simulatedExport} />}
+    </div>
+  );
+}
+
+function CoverStage({ cover, photoMap, texture, format, spineCm, showSafety }) {
+  const photo = cover.photoId ? photoMap.get(cover.photoId) : null;
+  const total = format.closedW * 2 + spineCm;
+  const backPct = (format.closedW / total) * 100;
+  const spinePct = (spineCm / total) * 100;
+  const frontPct = backPct;
+  return (
+    <div className="cover-layout">
+      <div className="cover-back" style={{ width: `${backPct}%`, background: texture.css }}>
+        <span>Verso bloqueado</span>
       </div>
+      <div className="cover-spine" style={{ width: `${spinePct}%`, minWidth: 8, background: texture.css }}>
+        <span>{(spineCm * 10).toFixed(0)}mm</span>
+      </div>
+      <div className="cover-front" style={{ width: `${frontPct}%` }}>
+        {photo ? <Photo src={photo.src} frame={cover} /> : <div className="cover-empty">Foto da capa frontal</div>}
+        {showSafety && <div className="safety cover-safe">Margem de segurança 0,3 cm</div>}
+        {cover.texts.map((text) => <TextBox key={text.id} text={text} />)}
+      </div>
+    </div>
+  );
+}
 
-      <footer className="filmstrip">
-        <div className="filmstrip-top">
-          <div className="selection-info">
-            <strong>{selectedPhotoIds.length} selecionada{selectedPhotoIds.length === 1 ? "" : "s"}</strong>
-            <span>Shift seleciona intervalo · Ctrl/Alt adiciona · arraste para a lâmina</span>
-          </div>
-          <div className="film-actions">
-            <button className={bottomFilter === "all" ? "active" : ""} onClick={() => setBottomFilter("all")}>Todas</button>
-            <button className={bottomFilter === "selected" ? "active" : ""} onClick={() => setBottomFilter("selected")}>Selecionadas</button>
-            <button className={bottomFilter === "unused" ? "active" : ""} onClick={() => setBottomFilter("unused")}>Não usadas</button>
-            <button onClick={() => uploadRef.current?.click()}>Importar fotos</button>
-            <button onClick={loadDemo}>Fotos demo</button>
-            <button onClick={() => buildSpread(selectedPhotoIds, 0)} disabled={!selectedPhotoIds.length}>Auto Build</button>
-          </div>
-        </div>
-        <div className="photos-row">
-          {!photoLibrary.length && (
-            <div className="empty-film">
-              <strong>Nenhuma foto carregada.</strong>
-              <span>Clique em “Importar fotos” ou “Fotos demo” para testar o diagramador.</span>
-            </div>
-          )}
-          {filteredPhotos.map((photo) => {
-            const index = photoLibrary.findIndex((item) => item.id === photo.id);
-            const order = selectedPhotoIds.indexOf(photo.id) + 1;
-            return (
-              <button
-                key={photo.id}
-                className={`photo-tile ${order ? "selected" : ""} ${usedPhotoIds.has(photo.id) ? "used" : ""}`}
-                draggable
-                onDragStart={() => setDragPhotoIds(selectedPhotoIds.includes(photo.id) ? selectedPhotoIds : [photo.id])}
-                onDragEnd={() => setDragPhotoIds([])}
-                onClick={(event) => photoClick(photo.id, index, event)}
-                title="Clique para selecionar. Arraste para montar a lâmina."
-              >
-                <img src={photo.src} alt={photo.name} draggable="false" />
-                <span className="photo-number">{index + 1}</span>
-                {order ? <span className="photo-order">{order}</span> : null}
-                {usedPhotoIds.has(photo.id) && !order ? <span className="used-badge">usada</span> : null}
-              </button>
-            );
-          })}
-        </div>
-      </footer>
+function SpreadStage({ spread, photoMap, showSafety, onSelectFrame, selectedFrameId }) {
+  return (
+    <div className="spread-layout">
+      <div className="page-label left">Página esquerda</div>
+      <div className="page-label right">Página direita</div>
+      <div className="center-fold" />
+      {showSafety && <div className="safety spread-safe">Área segura 0,3 cm</div>}
+      {spread?.frames?.length ? spread.frames.map((frame, index) => {
+        const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
+        return (
+          <button
+            key={frame.id}
+            className={`frame ${selectedFrameId === frame.id ? "selected" : ""}`}
+            style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
+            onClick={() => onSelectFrame(frame.id)}
+          >
+            <Photo src={photo?.src} frame={frame} />
+            <span>{index + 1}</span>
+          </button>
+        );
+      }) : <div className="blank-spread-message">Lâmina em branco. Selecione fotos e clique em “Montar automático”.</div>}
+      {spread?.texts?.map((text) => <TextBox key={text.id} text={text} />)}
+    </div>
+  );
+}
 
-      <input ref={uploadRef} type="file" accept="image/*" multiple hidden onChange={async (event) => { await addPhotos(event.target.files); event.target.value = ""; }} />
-      <input ref={addRef} type="file" accept="image/*" multiple hidden onChange={async (event) => { await addPhotos(event.target.files); event.target.value = ""; }} />
-      <input ref={replaceSelectedRef} type="file" accept="image/*" hidden onChange={async (event) => { await replaceSelectedFramePhoto(event.target.files); event.target.value = ""; }} />
+function TextBox({ text }) {
+  return (
+    <div className="text-box" style={{ left: `${text.x}%`, top: `${text.y}%`, fontSize: text.size, color: text.color }}>
+      {text.value}
+    </div>
+  );
+}
+
+function CropControls({ label, photo, target, onChange }) {
+  if (!photo) return <div className="empty-state">Selecione uma foto no rodapé e aplique aqui.</div>;
+  return (
+    <div className="crop-controls">
+      <div className="crop-preview">
+        <img src={photo.src} alt="" />
+      </div>
+      <strong>{label}</strong>
+      <label>Zoom</label>
+      <input type="range" min="0.6" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
+      <label>Horizontal</label>
+      <input type="range" min="-60" max="60" step="1" value={target.cropX || 0} onChange={(e) => onChange({ cropX: Number(e.target.value) })} />
+      <label>Vertical</label>
+      <input type="range" min="-60" max="60" step="1" value={target.cropY || 0} onChange={(e) => onChange({ cropY: Number(e.target.value) })} />
+      <Button variant="secondary" onClick={() => onChange({ cropScale: 1, cropX: 0, cropY: 0 })}>Centralizar</Button>
+    </div>
+  );
+}
+
+function Modal({ modal, onClose, onExport }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card">
+        {modal.type === "saved" && (
+          <>
+            <h2>Projeto salvo</h2>
+            <p>O projeto foi salvo no navegador para teste da V4.</p>
+          </>
+        )}
+        {modal.type === "preview" && (
+          <>
+            <h2>Pré-visualização</h2>
+            {modal.dataUrl ? <img className="preview-img" src={modal.dataUrl} alt="Prévia" /> : <div className="empty-state">Prévia simulada indisponível neste navegador.</div>}
+            <p>Esta é uma prévia visual. A prévia 3D interativa entra em uma fase posterior.</p>
+          </>
+        )}
+        {modal.type === "finalize" && (
+          <>
+            <h2>Conferência antes de finalizar</h2>
+            {modal.problems.length ? (
+              <div className="warning-box">
+                {modal.problems.map((p) => <p key={p}>⚠ {p}</p>)}
+              </div>
+            ) : <p className="success-box">Projeto sem alertas principais.</p>}
+            <label className="confirm-check"><input type="checkbox" /> Confirmo que revisei meu projeto e autorizo produção conforme exibido.</label>
+            <div className="modal-actions"><Button variant="secondary" onClick={onClose}>Voltar e revisar</Button><Button variant="warning" onClick={onExport}>Ver exportação simulada</Button></div>
+          </>
+        )}
+        {modal.type === "export" && (
+          <>
+            <h2>Exportação simulada</h2>
+            <p>Na próxima fase, estes arquivos serão JPGs reais em 300 DPI, prontos para a pasta de produção.</p>
+            <div className="file-list">{modal.files.map((file) => <code key={file}>{file}</code>)}</div>
+          </>
+        )}
+        {modal.type !== "finalize" && <div className="modal-actions"><Button onClick={onClose}>Fechar</Button></div>}
+      </div>
     </div>
   );
 }
