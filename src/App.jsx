@@ -110,63 +110,165 @@ function getSpineCm(pageCount) {
   return laminas * 0.1; // 1 mm por lâmina = 0,1 cm
 }
 
-function getLayouts(count, variant = 0) {
-  const safeCount = clamp(count, 1, 20);
-  const layouts = [];
-
-  // Grade limpa
-  const cols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
-  const rows = Math.ceil(safeCount / cols);
-  layouts.push(gridLayout(safeCount, cols, rows, 0, 0.8, 100, 100, 0));
-
-  // Destaque esquerdo
-  if (safeCount === 1) {
-    layouts.push([{ x: 0, y: 0, w: 100, h: 100 }]);
-  } else {
-    const rest = safeCount - 1;
-    const rightCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-    const rightRows = Math.ceil(rest / rightCols);
-    const slots = [{ x: 0, y: 0, w: 58, h: 100 }];
-    const smalls = gridLayout(rest, rightCols, rightRows, 58.8, 0.8, 41.2, 100, 0);
-    layouts.push([...slots, ...smalls]);
-  }
-
-  // Destaque direito
-  if (safeCount > 1) {
-    const rest = safeCount - 1;
-    const leftCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-    const leftRows = Math.ceil(rest / leftCols);
-    const smalls = gridLayout(rest, leftCols, leftRows, 0, 0.8, 41.2, 100, 0);
-    layouts.push([...smalls, { x: 47, y: 0, w: 53, h: 100 }]);
-  }
-
-  // Editorial em faixa
-  if (safeCount >= 3) {
-    const top = Math.min(3, safeCount);
-    const bottom = safeCount - top;
-    const slots = gridLayout(top, top, 1, 0, 0.8, 100, 38, 0);
-    if (bottom > 0) {
-      const bCols = Math.ceil(Math.sqrt(bottom * 2));
-      const bRows = Math.ceil(bottom / bCols);
-      slots.push(...gridLayout(bottom, bCols, bRows, 0, 0.8, 100, 61.2, 38.8));
-    }
-    layouts.push(slots.slice(0, safeCount));
-  }
-
-  return layouts[variant % layouts.length] || layouts[0];
+function gapPct(format, gapMm, axis = "x") {
+  const cm = gapMm / 10;
+  const base = axis === "x" ? format.spreadW : format.spreadH;
+  return round((cm / base) * 100);
 }
 
-function gridLayout(count, cols, rows, startX = 0, gap = 0.8, areaW = 100, areaH = 100, startY = 0) {
-  const cellW = (areaW - gap * (cols - 1)) / cols;
-  const cellH = (areaH - gap * (rows - 1)) / rows;
+function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
+  const safeCount = clamp(count, 1, 20);
+  const gapX = gapPct(format, gapMm, "x");
+  const gapY = gapPct(format, gapMm, "y");
+  const layouts = [];
+  const box = (x, y, w, h) => ({ x: round(x), y: round(y), w: round(w), h: round(h) });
+  const grid = (n, cols, rows, x = 0, y = 0, w = 100, h = 100) => gridLayout(n, cols, rows, x, gapX, gapY, w, h, y);
+
+  const leftBigW = 32;
+  const topBigH = 30;
+  const remW = 100 - leftBigW - gapX;
+  const remH = 100 - topBigH - gapY;
+  const rightX = leftBigW + gapX;
+  const bottomY = topBigH + gapY;
+  const twoColW = (remW - gapX) / 2;
+  const twoRowH = (remH - gapY) / 2;
+
+  if (safeCount === 1) {
+    layouts.push([box(0, 0, 100, 100)]);
+  }
+
+  if (safeCount === 2) {
+    layouts.push([
+      box(0, 0, (100 - gapX) / 2, 100),
+      box((100 - gapX) / 2 + gapX, 0, (100 - gapX) / 2, 100),
+    ]);
+    layouts.push([
+      box(0, 0, 100, (100 - gapY) / 2),
+      box(0, (100 - gapY) / 2 + gapY, 100, (100 - gapY) / 2),
+    ]);
+    layouts.push([
+      box(0, 0, 64, 100),
+      box(64 + gapX, 0, 36 - gapX, 100),
+    ]);
+  }
+
+  if (safeCount === 3) {
+    layouts.push([
+      box(0, 0, leftBigW, 100),
+      box(rightX, 0, remW, (100 - gapY) / 2),
+      box(rightX, (100 - gapY) / 2 + gapY, remW, (100 - gapY) / 2),
+    ]);
+    layouts.push([
+      box(0, 0, 100, topBigH),
+      box(0, bottomY, (100 - gapX) / 2, remH),
+      box((100 - gapX) / 2 + gapX, bottomY, (100 - gapX) / 2, remH),
+    ]);
+    layouts.push(grid(3, 3, 1));
+  }
+
+  if (safeCount === 4) {
+    layouts.push(grid(4, 2, 2));
+    layouts.push([
+      box(0, 0, leftBigW, 100),
+      box(rightX, 0, remW, topBigH),
+      box(rightX, bottomY, twoColW, remH),
+      box(rightX + twoColW + gapX, bottomY, twoColW, remH),
+    ]);
+    layouts.push([
+      box(0, 0, 100, topBigH),
+      box(0, bottomY, (100 - 2 * gapX) / 3, remH),
+      box((100 - 2 * gapX) / 3 + gapX, bottomY, (100 - 2 * gapX) / 3, remH),
+      box(((100 - 2 * gapX) / 3) * 2 + gapX * 2, bottomY, (100 - 2 * gapX) / 3, remH),
+    ]);
+  }
+
+  if (safeCount === 5) {
+    layouts.push([
+      box(0, 0, (100 - gapX) / 2, topBigH),
+      box((100 - gapX) / 2 + gapX, 0, (100 - gapX) / 2, topBigH),
+      box(0, bottomY, (100 - 2 * gapX) / 3, remH),
+      box((100 - 2 * gapX) / 3 + gapX, bottomY, (100 - 2 * gapX) / 3, remH),
+      box(((100 - 2 * gapX) / 3) * 2 + gapX * 2, bottomY, (100 - 2 * gapX) / 3, remH),
+    ]);
+    layouts.push([
+      box(0, 0, leftBigW, 100),
+      ...grid(4, 2, 2, rightX, 0, remW, 100),
+    ].slice(0, 5));
+    layouts.push([
+      box(0, 0, 100, 24),
+      ...grid(4, 2, 2, 0, 24 + gapY, 100, 76 - gapY),
+    ].slice(0, 5));
+  }
+
+  if (safeCount === 6) {
+    layouts.push(grid(6, 3, 2));
+    layouts.push([
+      box(0, 0, leftBigW, 100),
+      box(rightX, 0, remW, topBigH),
+      ...grid(4, 2, 2, rightX, bottomY, remW, remH),
+    ].slice(0, 6));
+    layouts.push([
+      box(0, 0, 100, topBigH),
+      box(0, bottomY, leftBigW, remH),
+      ...grid(4, 2, 2, rightX, bottomY, remW, remH),
+    ].slice(0, 6));
+  }
+
+  if (safeCount === 7) {
+    layouts.push([
+      box(0, 0, 100, 24),
+      ...grid(6, 3, 2, 0, 24 + gapY, 100, 76 - gapY),
+    ].slice(0, 7));
+    layouts.push([
+      box(0, 0, leftBigW, 100),
+      ...grid(6, 2, 3, rightX, 0, remW, 100),
+    ].slice(0, 7));
+    layouts.push([
+      box(0, 0, 100, topBigH),
+      ...grid(6, 3, 2, 0, bottomY, 100, remH),
+    ].slice(0, 7));
+  }
+
+  if (safeCount === 8) {
+    layouts.push(grid(8, 4, 2));
+    layouts.push([
+      box(0, 0, leftBigW, 100),
+      ...grid(7, 3, 3, rightX, 0, remW, 100),
+    ].slice(0, 8));
+    layouts.push([
+      box(0, 0, 100, 22),
+      ...grid(7, 4, 2, 0, 22 + gapY, 100, 78 - gapY),
+    ].slice(0, 8));
+  }
+
+  if (!layouts.length) {
+    const gridCols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
+    const gridRows = Math.ceil(safeCount / gridCols);
+    layouts.push(grid(safeCount, gridCols, gridRows));
+    if (safeCount > 1) {
+      const rest = safeCount - 1;
+      layouts.push([
+        box(0, 0, 58, 100),
+        ...grid(rest, rest <= 3 ? 1 : 2, Math.ceil(rest / (rest <= 3 ? 1 : 2)), 58 + gapX, 0, 42 - gapX, 100),
+      ].slice(0, safeCount));
+    }
+  }
+
+  return layouts[((variant % layouts.length) + layouts.length) % layouts.length] || layouts[0];
+}
+
+function gridLayout(count, cols, rows, startX = 0, gapX = 0.8, gapY = 0.8, areaW = 100, areaH = 100, startY = 0) {
+  if (!count) return [];
+  const cellW = (areaW - gapX * (cols - 1)) / cols;
+  const cellH = (areaH - gapY * (rows - 1)) / rows;
   return Array.from({ length: count }, (_, index) => {
     const row = Math.floor(index / cols);
     const col = index % cols;
     return {
-      x: round(startX + col * (cellW + gap)),
-      y: round(startY + row * (cellH + gap)),
-      w: round(cellW),
-      h: round(cellH),
+      x: round(startX + col * (cellW + gapX)),
+      y: round(startY + row * (cellH + gapY)),
+      w: round(Math.max(4, cellW)),
+      h: round(Math.max(4, cellH)),
     };
   });
 }
@@ -175,8 +277,8 @@ function round(v) {
   return Math.round(v * 100) / 100;
 }
 
-function createFrames(photoIds, variant = 0) {
-  const slots = getLayouts(photoIds.length, variant);
+function createFrames(photoIds, variant = 0, format = FORMATS[3], gapMm = 1) {
+  const slots = getLayouts(photoIds.length, variant, format, gapMm);
   return slots.map((slot, index) => ({
     id: uid("frame"),
     photoId: photoIds[index],
@@ -310,6 +412,7 @@ export default function App() {
   const [selectedObjects, setSelectedObjects] = useState([]);
   const [guides, setGuides] = useState({ vertical: [], horizontal: [] });
   const [showSafety, setShowSafety] = useState(true);
+  const [frameGapMm, setFrameGapMm] = useState(1);
   const [modal, setModal] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
   const fileInputRef = useRef(null);
@@ -373,7 +476,10 @@ export default function App() {
       vertical.push(item.bounds.left, item.bounds.left + item.bounds.width / 2, item.bounds.left + item.bounds.width);
       horizontal.push(item.bounds.top, item.bounds.top + item.bounds.height / 2, item.bounds.top + item.bounds.height);
     });
-    if (active.type === "spread") vertical.push(50);
+    if (active.type === "spread") {
+      vertical.push(25, 50, 75);
+      horizontal.push(50);
+    }
     return { vertical, horizontal };
   }
 
@@ -536,6 +642,16 @@ export default function App() {
     applyPhotoToCover(id);
   }
 
+  function handleFrameGapChange(nextGap) {
+    setFrameGapMm(nextGap);
+    if (active.type !== "spread") return;
+    setSpreads((prev) => prev.map((spread, index) => {
+      if (index !== active.index || !spread.frames.length) return spread;
+      const photoIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
+      return { ...spread, frames: createFrames(photoIds, spread.layoutVariant || 0, format, nextGap) };
+    }));
+  }
+
   function autoBuildCurrentSpread() {
     if (active.type !== "spread") {
       alert("Clique em uma página do miolo no rodapé para montar a lâmina.");
@@ -546,7 +662,7 @@ export default function App() {
       ids = photos.filter((p) => !usedPhotoIds.has(p.id)).slice(0, 4).map((p) => p.id);
     }
     if (!ids.length) return alert("Importe ou selecione fotos primeiro.");
-    setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
+    setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0, format, frameGapMm) } : spread));
   }
 
   function changeLayout(direction) {
@@ -555,7 +671,7 @@ export default function App() {
       if (index !== active.index || !spread.frames.length) return spread;
       const nextVariant = (spread.layoutVariant || 0) + direction;
       const photoIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
-      return { ...spread, layoutVariant: nextVariant, frames: createFrames(photoIds, ((nextVariant % 4) + 4) % 4) };
+      return { ...spread, layoutVariant: nextVariant, frames: createFrames(photoIds, nextVariant, format, frameGapMm) };
     }));
   }
 
@@ -910,6 +1026,50 @@ export default function App() {
     setSelectedTextId(null);
   }
 
+  function swapFramePhotos(spreadIndex, sourceFrameId, targetFrameId) {
+    if (!sourceFrameId || !targetFrameId || sourceFrameId === targetFrameId) return;
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== spreadIndex) return spread;
+      const source = spread.frames.find((frame) => frame.id === sourceFrameId);
+      const target = spread.frames.find((frame) => frame.id === targetFrameId);
+      if (!source || !target) return spread;
+      return {
+        ...spread,
+        frames: spread.frames.map((frame) => {
+          if (frame.id === sourceFrameId) {
+            return {
+              ...frame,
+              photoId: target.photoId || null,
+              cropScale: target.cropScale || 1,
+              cropX: target.cropX || 0,
+              cropY: target.cropY || 0,
+            };
+          }
+          if (frame.id === targetFrameId) {
+            return {
+              ...frame,
+              photoId: source.photoId || null,
+              cropScale: source.cropScale || 1,
+              cropX: source.cropX || 0,
+              cropY: source.cropY || 0,
+            };
+          }
+          return frame;
+        }),
+      };
+    }));
+    setSelectedFrameId(targetFrameId);
+    setSelectedTextId(null);
+  }
+
+  function handleFramePhotoDrop(spreadIndex, frameId, photoId, sourceFrameId = null) {
+    if (sourceFrameId) {
+      swapFramePhotos(spreadIndex, sourceFrameId, frameId);
+      return;
+    }
+    if (photoId) applyPhotoToFrame(spreadIndex, frameId, photoId);
+  }
+
   function handleDrop(event) {
     event.preventDefault();
     const photoId = event.dataTransfer.getData("photo/id");
@@ -918,7 +1078,7 @@ export default function App() {
       applyPhotoToCover(photoId);
     } else {
       const ids = Array.from(new Set([photoId, ...selectedPhotoIds])).slice(0, 20);
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
+      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0, format, frameGapMm) } : spread));
     }
   }
 
@@ -973,14 +1133,14 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5-5", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5-7", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5.5",
+      version: "V5.7",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -988,6 +1148,7 @@ export default function App() {
       spineCm,
       texture: texture.label,
       safetyMarginCm: SAFETY_MARGIN_CM,
+      frameGapMm,
       production: {
         output: "JPG limpo",
         dpi: 300,
@@ -1045,8 +1206,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.5</strong>
-            <span>Meia Capa Fotográfica · bleed total + foto inteira + resize/alinhamento</span>
+            <strong>Diagramador Picmimos V5.7</strong>
+            <span>Meia Capa Fotográfica · enquadramento SmartAlbums + troca de fotos + layouts livres</span>
           </div>
         </div>
         <div className="top-actions">
@@ -1103,6 +1264,14 @@ export default function App() {
             {active.type === "spread" && <Button variant="secondary" onClick={autoBuildCurrentSpread}>Montar automático</Button>}
             {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>}
             {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>}
+            {active.type === "spread" && (
+              <label className="gap-control" title="Distância entre os quadros do layout automático">
+                <span>Espaço</span>
+                <select value={frameGapMm} onChange={(event) => handleFrameGapChange(Number(event.target.value))}>
+                  {[0, 1, 2, 3, 4, 5].map((mm) => <option key={mm} value={mm}>{mm} mm</option>)}
+                </select>
+              </label>
+            )}
             <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Corte 3 mm (visual)</Button>
             <Button variant="secondary" onClick={addText}>Texto</Button>
             <Button variant="danger" onClick={clearActive}>Limpar</Button>
@@ -1142,7 +1311,8 @@ export default function App() {
                 selectedFrameId={selectedFrameId}
                 selectedObjects={selectedObjects}
                 guides={guides}
-                onDropPhoto={applyPhotoToFrame}
+                onDropPhoto={handleFramePhotoDrop}
+                onSwapFramePhoto={swapFramePhotos}
                 onPhotoPan={startPhotoPan}
                 onPhotoWheel={zoomPhoto}
                 onMoveFrame={startFrameMove}
@@ -1170,7 +1340,7 @@ export default function App() {
           ) : selectedFrame ? (
             <CropControls label="Foto selecionada" photo={currentPhotoForPanel} target={selectedFrame} onChange={updateFrameCrop} />
           ) : (
-            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom/enquadramento, ou arraste outra foto para trocar. Ao selecionar 2 elementos com Shift, aparecem os botões de alinhamento.</div>
+            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom/enquadramento. Para trocar fotos entre quadros, selecione o quadro e arraste o botão “Trocar foto” para outro quadro. Ao selecionar 2 elementos com Shift, aparecem os botões de alinhamento.</div>
           )}
         </section>
 
@@ -1323,6 +1493,7 @@ function SpreadStage({
   selectedObjects,
   guides,
   onDropPhoto,
+  onSwapFramePhoto,
   onPhotoPan,
   onPhotoWheel,
   onMoveFrame,
@@ -1340,6 +1511,7 @@ function SpreadStage({
       <div className="page-label left">Página esquerda</div>
       <div className="page-label right">Página direita</div>
       <div className="center-fold" />
+      {showSafety && <><div className="page-center-guide left-center" /><div className="page-center-guide right-center" /><div className="page-middle-guide" /></>}
       <GuideLines guides={guides} />
       {showSafety && <div className="safety spread-safe">Área segura 0,3 cm</div>}
       {spread?.frames?.length ? spread.frames.map((frame, index) => {
@@ -1359,19 +1531,29 @@ function SpreadStage({
               event.preventDefault();
               event.stopPropagation();
               const photoId = event.dataTransfer.getData("photo/id");
+              const sourceFrameId = event.dataTransfer.getData("frame-photo/id");
+              if (sourceFrameId) {
+                onSwapFramePhoto(spreadIndex, sourceFrameId, frame.id);
+                return;
+              }
               if (photoId) onDropPhoto(spreadIndex, frame.id, photoId);
             }}
             onDragOver={(event) => event.preventDefault()}
             onPointerDown={(event) => {
-              if (event.target.closest(".frame-transform-handle") || event.target.closest(".frame-move-label")) return;
+              if (event.target.closest(".frame-transform-handle") || event.target.closest(".frame-move-label") || event.target.closest(".frame-swap-handle")) return;
               onSelectFrame(frame.id, event);
-              if (event.shiftKey) return;
-              onMoveFrame(event, frame);
             }}
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
-            title="Clique e arraste para mover o quadro. Arraste as bolinhas para redimensionar."
+            title="Arraste a foto para enquadrar. Use Mover para mover o quadro e as bolinhas para redimensionar."
           >
-            <div className="frame-crop" onDoubleClick={(event) => { event.stopPropagation(); if (photo) onPhotoPan(event, "frame", frame.id, frame); }}>
+            <div
+              className="frame-crop"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onSelectFrame(frame.id, event);
+                if (!event.shiftKey && photo) onPhotoPan(event, "frame", frame.id, frame);
+              }}
+            >
               <Photo src={photo?.src} frame={frame} />
             </div>
             <span>{index + 1}</span>
@@ -1388,6 +1570,18 @@ function SpreadStage({
                   />
                 ))}
                 <button type="button" className="frame-move-label" onPointerDown={(event) => onMoveFrame(event, frame)} title="Mover quadro">Mover</button>
+                <button
+                  type="button"
+                  className="frame-swap-handle"
+                  draggable
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onDragStart={(event) => {
+                    event.stopPropagation();
+                    event.dataTransfer.setData("frame-photo/id", frame.id);
+                    event.dataTransfer.effectAllowed = "move";
+                  }}
+                  title="Arraste este botão até outro quadro para trocar as fotos"
+                >Trocar foto</button>
               </>
             )}
           </div>
@@ -1564,7 +1758,7 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
         <img src={photo.src} alt="" />
       </div>
       <strong>{label}</strong>
-      <p className="hint">Agora a foto entra inteira por padrão. Use zoom apenas se quiser aproximar e os controles Horizontal/Vertical para centralizar exatamente como desejar.</p>
+      <p className="hint">A foto preenche o quadro como no SmartAlbums. Arraste a própria foto no canvas para enquadrar; use zoom e Horizontal/Vertical para ajuste fino.</p>
       <label>Zoom</label>
       <input type="range" min="1" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
       <label>Horizontal</label>
