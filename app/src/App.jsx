@@ -3,30 +3,25 @@ import * as htmlToImage from "html-to-image";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
+import {
+  COVER_MODELS,
+  DEFAULT_COVER_MODEL_ID,
+  DEFAULT_FORMAT_ID,
+  DEFAULT_TEXTURE_ID,
+  FORMATS,
+  INTERIOR,
+  PAGE_OPTIONS,
+  SAFETY_MARGIN_CM,
+  TEXTURES,
+  findCoverModel,
+  findFormat,
+  findTexture,
+  getSpineCm,
+  makePageCountOptions,
+} from "./config/productConfigs";
 
-const MAX_PAGES = 120;
-const MIN_PAGES = 20;
-const SAFETY_MARGIN_CM = 0.3;
-
-const FORMATS = [
-  { id: "15x15", label: "15x15", closedW: 15, closedH: 15, spreadW: 30, spreadH: 15.2, orientation: "quadrado" },
-  { id: "15x21-v", label: "15x21 vertical", closedW: 15, closedH: 21, spreadW: 30, spreadH: 20.4, orientation: "vertical" },
-  { id: "15x21-h", label: "15x21 horizontal", closedW: 21, closedH: 15, spreadW: 42, spreadH: 15.2, orientation: "horizontal" },
-  { id: "20x20", label: "20x20", closedW: 20, closedH: 20, spreadW: 40, spreadH: 20.3, orientation: "quadrado" },
-  { id: "20x25-v", label: "20x25 vertical", closedW: 20, closedH: 25, spreadW: 40, spreadH: 25.4, orientation: "vertical" },
-  { id: "20x25-h", label: "20x25 horizontal", closedW: 25, closedH: 20, spreadW: 50, spreadH: 20.3, orientation: "horizontal" },
-  { id: "25x25", label: "25x25", closedW: 25, closedH: 25, spreadW: 50, spreadH: 25.4, orientation: "quadrado" },
-  { id: "30x30", label: "30x30", closedW: 30, closedH: 30, spreadW: 60, spreadH: 30.5, orientation: "quadrado" },
-  { id: "30x40", label: "30x40", closedW: 30, closedH: 40, spreadW: 60, spreadH: 40.0, orientation: "vertical" },
-];
-
-const TEXTURES = [
-  { id: "preto", label: "Courino Preto", css: "linear-gradient(135deg, #111 0%, #333 50%, #080808 100%)" },
-  { id: "marrom", label: "Courino Marrom", css: "linear-gradient(135deg, #5a351f 0%, #7d5132 48%, #3b2114 100%)" },
-  { id: "champagne", label: "Dune Champagne", css: "linear-gradient(135deg, #d7c5a0 0%, #efe3c7 52%, #bca878 100%)" },
-  { id: "cinza", label: "Courino Cinza", css: "linear-gradient(135deg, #5f6265 0%, #9a9da0 50%, #404245 100%)" },
-  { id: "branco", label: "Courino Branco", css: "linear-gradient(135deg, #eeeeee 0%, #ffffff 45%, #d7d7d7 100%)" },
-];
+const MIN_PAGES = PAGE_OPTIONS.minPages;
+const MAX_PAGES = PAGE_OPTIONS.maxPages;
 
 const TEXT_FONTS = [
   { value: "Arial, Helvetica, sans-serif", label: "Arial" },
@@ -108,11 +103,6 @@ function buildBlankSpreads(pageCount) {
   return Array.from({ length: spreadCount }, (_, index) => createBlankSpread(index));
 }
 
-function getSpineCm(pageCount) {
-  const laminas = pageCount / 2;
-  return laminas * 0.1; // 1 mm por lâmina = 0,1 cm
-}
-
 function gapPct(format, gapMm, axis = "x") {
   const cm = gapMm / 10;
   const base = axis === "x" ? format.spreadW : format.spreadH;
@@ -162,7 +152,7 @@ function buildFullMosaicLayout(count, gapX = 0.8, gapY = 0.8, variant = 0) {
   }).slice(0, safeCount);
 }
 
-function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
+function getLayouts(count, variant = 0, format = findFormat(DEFAULT_FORMAT_ID), gapMm = 1) {
   const safeCount = clamp(count, 1, 20);
   const gapX = gapPct(format, gapMm, "x");
   const gapY = gapPct(format, gapMm, "y");
@@ -330,7 +320,7 @@ function round(v) {
   return Math.round(v * 100) / 100;
 }
 
-function createFrames(photoIds, variant = 0, format = FORMATS[3], gapMm = 1) {
+function createFrames(photoIds, variant = 0, format = findFormat(DEFAULT_FORMAT_ID), gapMm = 1) {
   const slots = getLayouts(photoIds.length, variant, format, gapMm);
   return slots.map((slot, index) => ({
     id: uid("frame"),
@@ -457,9 +447,10 @@ function Button({ children, onClick, variant = "primary", disabled = false, titl
 }
 
 export default function App() {
-  const [formatId, setFormatId] = useState("20x20");
-  const [pageCount, setPageCount] = useState(20);
-  const [textureId, setTextureId] = useState("champagne");
+  const [coverModelId, setCoverModelId] = useState(DEFAULT_COVER_MODEL_ID);
+  const [formatId, setFormatId] = useState(DEFAULT_FORMAT_ID);
+  const [pageCount, setPageCount] = useState(PAGE_OPTIONS.minPages);
+  const [textureId, setTextureId] = useState(DEFAULT_TEXTURE_ID);
   const [photos, setPhotos] = useState([]);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
   const [cover, setCover] = useState({ photoId: null, cropScale: 1, cropX: 0, cropY: 0, texts: [] });
@@ -477,8 +468,10 @@ export default function App() {
   const coverFileInputRef = useRef(null);
   const stageRef = useRef(null);
 
-  const format = useMemo(() => FORMATS.find((item) => item.id === formatId) || FORMATS[3], [formatId]);
-  const texture = useMemo(() => TEXTURES.find((item) => item.id === textureId) || TEXTURES[0], [textureId]);
+  const coverModel = useMemo(() => findCoverModel(coverModelId), [coverModelId]);
+  const format = useMemo(() => findFormat(formatId), [formatId]);
+  const texture = useMemo(() => findTexture(textureId), [textureId]);
+  const pageCountOptions = useMemo(() => makePageCountOptions(), []);
   const photoMap = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
   const currentSpread = active.type === "spread" ? spreads[active.index] : null;
   const selectedFrame = currentSpread?.frames.find((frame) => frame.id === selectedFrameId) || null;
@@ -1248,27 +1241,31 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5-7", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v3-2-config-base", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5.7",
-      product: "Meia Capa Fotográfica",
+      version: "V3.2 Config Base",
+      product: coverModel.label,
+      coverModelId,
+      coverRule: coverModel.cover,
       format: format.label,
+      formatId: format.id,
       pages: pageCount,
       laminas: pageCount / 2,
       spineCm,
       texture: texture.label,
+      textureId: texture.id,
       safetyMarginCm: SAFETY_MARGIN_CM,
       frameGapMm,
       production: {
-        output: "JPG limpo",
+        output: INTERIOR.productionOutput,
         dpi: 300,
-        paper: "Fuji com UV Fosco",
-        cover: "Somente frente fotográfica; verso/lombada revestimento",
+        paper: `${INTERIOR.paper} com ${INTERIOR.finish}`,
+        cover: coverModel.cover.description,
       },
       cover,
       spreads,
@@ -1279,7 +1276,7 @@ export default function App() {
 
   function buildPreview3DPages() {
     const pages = [];
-    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm });
+    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm, coverModel });
     spreads.forEach((spread, index) => {
       pages.push({
         id: `preview-spread-${spread.id || index}`,
@@ -1289,6 +1286,7 @@ export default function App() {
         format,
         spineCm,
         texture,
+        coverModel,
       });
     });
     return pages;
@@ -1354,8 +1352,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.7</strong>
-            <span>Meia Capa Fotográfica · enquadramento SmartAlbums + troca de fotos + layouts livres</span>
+            <strong>Diagramador Picmimos V3.2 Config Base</strong>
+            <span>Configuração central de modelos, formatos, páginas e revestimentos</span>
           </div>
         </div>
         <div className="top-actions">
@@ -1368,6 +1366,11 @@ export default function App() {
       <aside className="left-panel">
         <section className="panel-card">
           <h3>Produto</h3>
+          <label>Modelo de capa</label>
+          <select value={coverModelId} onChange={(e) => setCoverModelId(e.target.value)}>
+            {COVER_MODELS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+
           <label>Formato fechado</label>
           <select value={formatId} onChange={(e) => setFormatId(e.target.value)}>
             {FORMATS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -1375,19 +1378,22 @@ export default function App() {
 
           <label>Quantidade de páginas</label>
           <select value={pageCount} onChange={(e) => handlePagesChange(e.target.value)}>
-            {Array.from({ length: (MAX_PAGES - MIN_PAGES) / 2 + 1 }, (_, i) => MIN_PAGES + i * 2).map((p) => <option key={p} value={p}>{p} páginas ({p / 2} lâminas)</option>)}
+            {pageCountOptions.map((p) => <option key={p} value={p}>{p} páginas ({p / 2} lâminas)</option>)}
           </select>
 
           <label>Textura do verso/lombada</label>
           <select value={textureId} onChange={(e) => setTextureId(e.target.value)}>
             {TEXTURES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
+          <p className="hint">{coverModel.cover.description}</p>
 
           <div className="spec-grid">
+            <div><span>Modelo</span><strong>{coverModel.shortLabel}</strong></div>
             <div><span>Miolo</span><strong>{format.spreadW} x {format.spreadH} cm</strong></div>
             <div><span>Lombada</span><strong>{(spineCm * 10).toFixed(0)} mm</strong></div>
+            <div><span>Miolo</span><strong>{INTERIOR.paper}</strong></div>
             <div><span>Refilo</span><strong>3 mm total</strong></div>
-            <div><span>Saída</span><strong>JPG limpo</strong></div>
+            <div><span>Saída</span><strong>{INTERIOR.productionOutput}</strong></div>
           </div>
         </section>
 
@@ -2059,16 +2065,11 @@ function Preview3DEnvironment() {
 }
 
 function getTextureColor(texture) {
-  const id = texture?.id || "champagne";
-  if (id === "preto") return "#171615";
-  if (id === "marrom") return "#6d4328";
-  if (id === "cinza") return "#777b80";
-  if (id === "branco") return "#f2f0ec";
-  return "#c9b99b";
+  return texture?.previewColor || "#c9b99b";
 }
 
 function getPreviewBookSize(page) {
-  const format = page?.format || FORMATS[3];
+  const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
   const coverH = 1.62;
   const coverW = clamp(coverH * (format.closedW / format.closedH), 1.1, 2.45);
   const spreadW = clamp(coverH * (format.spreadW / format.spreadH), 2.25, 4.6);
@@ -2118,7 +2119,7 @@ function drawImageCover(ctx, image, x, y, w, h, cropX = 0, cropY = 0, cropScale 
 }
 
 async function buildSpreadCanvas(page, photoMap) {
-  const format = page?.format || FORMATS[3];
+  const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
   const aspect = Math.max(format.spreadW / Math.max(format.spreadH, 1), 1.2);
   const width = 1800;
   const height = Math.round(width / aspect);
@@ -2163,7 +2164,7 @@ async function buildSpreadCanvas(page, photoMap) {
 }
 
 async function buildCoverCanvas(page, photoMap) {
-  const format = page?.format || FORMATS[3];
+  const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
   const aspect = Math.max(format.closedW / Math.max(format.closedH, 1), 0.8);
   const width = 1000;
   const height = Math.round(width / aspect);
