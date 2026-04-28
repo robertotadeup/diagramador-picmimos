@@ -2,13 +2,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+RUN corepack enable
+
 COPY package*.json ./
 
-RUN npm install --include=dev
+RUN pnpm install --no-frozen-lockfile
 
 COPY . .
 
-RUN npx vite build
+RUN pnpm exec vite build
 
 FROM nginx:alpine
 
