@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
+import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, Html, OrbitControls } from "@react-three/drei";
+import { ContactShadows, OrbitControls } from "@react-three/drei";
 
 const MAX_PAGES = 120;
 const MIN_PAGES = 20;
@@ -1939,49 +1940,73 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
 
 function Preview3D({ pages, photoMap }) {
   const [index, setIndex] = useState(0);
+  const [turn, setTurn] = useState(null);
   const total = pages.length;
   const page = pages[index] || null;
-  const canPrev = index > 0;
-  const canNext = index < total - 1;
+  const canPrev = index > 0 && !turn;
+  const canNext = index < total - 1 && !turn;
 
   useEffect(() => {
     setIndex(0);
+    setTurn(null);
   }, [total]);
+
+  function go(direction) {
+    if (turn) return;
+    const nextIndex = clamp(index + direction, 0, total - 1);
+    if (nextIndex === index) return;
+    setTurn({ from: index, to: nextIndex, direction, id: Date.now() });
+  }
 
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        setIndex((value) => Math.min(total - 1, value + 1));
+        go(1);
       }
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        setIndex((value) => Math.max(0, value - 1));
+        go(-1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [total]);
+  }, [index, total, turn]);
+
+  const displayedPage = turn ? (pages[turn.from] || page) : page;
+  const targetPage = turn ? (pages[turn.to] || null) : null;
+  const labelIndex = turn ? turn.to : index;
 
   return (
-    <div className="preview3d-shell">
+    <div className="preview3d-shell preview3d-v3">
       <div className="preview3d-canvas-wrap">
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 1.55, 4.65], fov: 34 }} gl={{ alpha: true, antialias: true }}>
-          <ambientLight intensity={0.78} />
-          <hemisphereLight args={["#fff7e8", "#8aa0b8", 0.85]} />
-          <directionalLight position={[3.8, 5.4, 3.2]} intensity={2.85} castShadow shadow-mapSize={[2048, 2048]} />
-          <directionalLight position={[-3.6, 2.2, 2.8]} intensity={0.62} />
-          <pointLight position={[0, 2.4, 2.8]} intensity={0.7} />
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 1.45, 4.75], fov: 35 }} gl={{ alpha: true, antialias: true }}>
+          <color attach="background" args={["#edf1f5"]} />
+          <ambientLight intensity={0.62} />
+          <hemisphereLight args={["#fff7ea", "#8aa0b8", 1.1]} />
+          <directionalLight position={[3.6, 5.4, 3.4]} intensity={3.1} castShadow shadow-mapSize={[2048, 2048]} />
+          <directionalLight position={[-3.2, 2.1, 2.7]} intensity={0.72} />
+          <pointLight position={[0.2, 2.2, 2.8]} intensity={0.58} />
           <Preview3DEnvironment />
-          <Album3D page={page} photoMap={photoMap} />
-          <ContactShadows position={[0, -1.08, 0]} opacity={0.48} scale={5.8} blur={2.6} far={3.2} />
-          <OrbitControls enablePan={false} minDistance={3.2} maxDistance={6.4} minPolarAngle={0.78} maxPolarAngle={1.62} />
+          <RigidAlbum3D
+            page={displayedPage}
+            targetPage={targetPage}
+            turn={turn}
+            photoMap={photoMap}
+            onTurnDone={() => {
+              if (!turn) return;
+              setIndex(turn.to);
+              setTurn(null);
+            }}
+          />
+          <ContactShadows position={[0, -1.11, 0]} opacity={0.56} scale={6.2} blur={2.3} far={3.5} />
+          <OrbitControls enablePan={false} minDistance={3.0} maxDistance={6.2} minPolarAngle={0.72} maxPolarAngle={1.55} />
         </Canvas>
-        <button type="button" className="preview3d-arrow left" onClick={() => canPrev && setIndex((value) => Math.max(0, value - 1))} disabled={!canPrev} aria-label="Folhear para trás">‹</button>
-        <button type="button" className="preview3d-arrow right" onClick={() => canNext && setIndex((value) => Math.min(total - 1, value + 1))} disabled={!canNext} aria-label="Folhear para frente">›</button>
+        <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={!canPrev} aria-label="Folhear para trás">‹</button>
+        <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={!canNext} aria-label="Folhear para frente">›</button>
         <div className="preview3d-floating-actions">
-          <span>{page?.title || "Prévia"}</span>
-          <strong>{index + 1} / {Math.max(total, 1)}</strong>
+          <span>{pages[labelIndex]?.title || "Prévia"}</span>
+          <strong>{labelIndex + 1} / {Math.max(total, 1)}</strong>
         </div>
       </div>
       <div className="preview3d-dots">
@@ -1989,8 +2014,11 @@ function Preview3D({ pages, photoMap }) {
           <button
             type="button"
             key={item.id || pageIndex}
-            className={`preview3d-dot ${pageIndex === index ? "on" : ""}`}
-            onClick={() => setIndex(pageIndex)}
+            className={`preview3d-dot ${pageIndex === labelIndex ? "on" : ""}`}
+            onClick={() => {
+              if (turn || pageIndex === index) return;
+              setTurn({ from: index, to: pageIndex, direction: pageIndex > index ? 1 : -1, id: Date.now() });
+            }}
             aria-label={`Ir para ${item.title || `prévia ${pageIndex + 1}`}`}
           />
         ))}
@@ -2002,195 +2030,306 @@ function Preview3D({ pages, photoMap }) {
 function Preview3DEnvironment() {
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.11, 0]}>
-        <circleGeometry args={[4.35, 128]} />
-        <meshStandardMaterial color="#f3efe6" roughness={0.36} metalness={0.03} transparent opacity={0.98} />
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.12, 0]}>
+        <circleGeometry args={[4.6, 128]} />
+        <meshStandardMaterial color="#f4efe7" roughness={0.34} metalness={0.04} />
       </mesh>
-
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.105, 0]}>
-        <ringGeometry args={[2.1, 4.35, 128]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.22} metalness={0.02} transparent opacity={0.16} />
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.115, 0]}>
+        <ringGeometry args={[2.1, 4.6, 128]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.26} metalness={0.03} transparent opacity={0.18} />
       </mesh>
-
-      <mesh position={[0, 0.78, -2.68]} receiveShadow>
-        <planeGeometry args={[7.6, 3.2]} />
-        <meshStandardMaterial color="#eef3f8" roughness={0.7} transparent opacity={0.42} />
+      <mesh position={[0, 0.72, -2.95]} receiveShadow>
+        <planeGeometry args={[8.5, 3.45]} />
+        <meshStandardMaterial color="#eef3f7" roughness={0.72} transparent opacity={0.78} />
       </mesh>
-
-      <mesh position={[-2.7, 0.82, -2.58]} rotation={[0, 0.16, 0]}>
-        <planeGeometry args={[1.6, 2.55]} />
-        <meshStandardMaterial color="#fff4da" roughness={0.8} transparent opacity={0.22} />
+      <mesh position={[-2.8, 0.78, -2.86]} rotation={[0, 0.18, 0]}>
+        <planeGeometry args={[1.55, 2.55]} />
+        <meshStandardMaterial color="#fff6dd" roughness={0.82} transparent opacity={0.30} />
       </mesh>
-
-      <mesh position={[2.65, 0.86, -2.52]} rotation={[0, -0.16, 0]}>
-        <planeGeometry args={[1.7, 2.65]} />
-        <meshStandardMaterial color="#d7e8ff" roughness={0.82} transparent opacity={0.18} />
+      <mesh position={[2.75, 0.82, -2.82]} rotation={[0, -0.18, 0]}>
+        <planeGeometry args={[1.75, 2.7]} />
+        <meshStandardMaterial color="#dcecff" roughness={0.84} transparent opacity={0.28} />
       </mesh>
     </group>
   );
+}
+
+function getTextureColor(texture) {
+  const id = texture?.id || "champagne";
+  if (id === "preto") return "#171615";
+  if (id === "marrom") return "#6d4328";
+  if (id === "cinza") return "#777b80";
+  if (id === "branco") return "#f2f0ec";
+  return "#c9b99b";
 }
 
 function getPreviewBookSize(page) {
   const format = page?.format || FORMATS[3];
   const coverH = 1.62;
   const coverW = clamp(coverH * (format.closedW / format.closedH), 1.1, 2.45);
-  const spreadW = clamp(coverH * (format.spreadW / format.closedH), 2.1, 4.55);
+  const spreadW = clamp(coverH * (format.spreadW / format.spreadH), 2.25, 4.6);
   const spreadH = coverH;
   const spineCm = page?.spineCm || getSpineCm(MIN_PAGES);
-  const spineW = clamp((spineCm / Math.max(format.closedW, 1)) * coverW, 0.07, 0.30);
-  const thickness = clamp(spineW * 0.7, 0.075, 0.16);
-  return { coverW, coverH, spreadW, spreadH, spineW, thickness };
+  const spineW = clamp((spineCm / Math.max(format.closedW, 1)) * coverW, 0.08, 0.36);
+  const pageThickness = clamp(spineW / Math.max(8, MIN_PAGES / 2), 0.012, 0.026);
+  const coverThickness = clamp(pageThickness * 2.25, 0.04, 0.075);
+  const blockThickness = clamp(spineW * 0.78, 0.07, 0.26);
+  return { coverW, coverH, spreadW, spreadH, spineW, pageThickness, coverThickness, blockThickness };
 }
 
-function Album3D({ page, photoMap }) {
-  const groupRef = useRef(null);
-  const lastType = useRef(page?.id || "");
-  const turnRef = useRef(0);
+function useImageTexture(src) {
+  const [texture, setTexture] = useState(null);
 
   useEffect(() => {
-    if (lastType.current !== page?.id) {
-      turnRef.current = 1;
-      lastType.current = page?.id || "";
+    let cancelled = false;
+    if (!src) {
+      setTexture(null);
+      return undefined;
     }
-  }, [page?.id]);
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      if (cancelled) return;
+      const tex = new THREE.Texture(image);
+      tex.needsUpdate = true;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      setTexture(tex);
+    };
+    image.onerror = () => {
+      if (!cancelled) setTexture(null);
+    };
+    image.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
 
-  useFrame((state, delta) => {
-    if (!groupRef.current) return;
-    groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.65) * 0.018;
-    turnRef.current = Math.max(0, turnRef.current - delta * 2.8);
-    groupRef.current.rotation.z = Math.sin(turnRef.current * Math.PI) * 0.035;
-  });
-
-  if (!page) return null;
-
-  return (
-    <group ref={groupRef} position={[0, -0.08, 0]} rotation={[0.02, -0.2, 0]}>
-      {page.type === "cover" ? <ClosedAlbum3D page={page} photoMap={photoMap} /> : <OpenAlbum3D page={page} photoMap={photoMap} />}
-    </group>
-  );
+  return texture;
 }
 
-function ClosedAlbum3D({ page, photoMap }) {
-  const { coverW, coverH, spineW, thickness } = getPreviewBookSize(page);
-  const totalW = coverW + spineW;
-  const spinePx = Math.max(24, Math.round(spineW * 140));
-  const domW = Math.round(totalW * 170);
-  const domH = Math.round(coverH * 170);
+function PhotoPlane({ src, x, y, w, h, z = 0.018, cropX = 0, cropY = 0, cropScale = 1 }) {
+  const texture = useImageTexture(src);
+
+  useEffect(() => {
+    if (!texture?.image) return;
+    const imageAspect = texture.image.width / Math.max(texture.image.height, 1);
+    const planeAspect = w / Math.max(h, 0.001);
+    let repeatX = 1;
+    let repeatY = 1;
+    if (imageAspect > planeAspect) repeatX = planeAspect / imageAspect;
+    else repeatY = imageAspect / planeAspect;
+    repeatX = clamp(repeatX / Math.max(cropScale, 1), 0.05, 1);
+    repeatY = clamp(repeatY / Math.max(cropScale, 1), 0.05, 1);
+    const maxX = Math.max(0, 1 - repeatX);
+    const maxY = Math.max(0, 1 - repeatY);
+    const offsetX = clamp((1 - repeatX) / 2 + (cropX || 0) / 160 * maxX, 0, maxX);
+    const offsetY = clamp((1 - repeatY) / 2 - (cropY || 0) / 160 * maxY, 0, maxY);
+    texture.repeat.set(repeatX, repeatY);
+    texture.offset.set(offsetX, offsetY);
+    texture.needsUpdate = true;
+  }, [texture, w, h, cropX, cropY, cropScale]);
 
   return (
-    <group rotation={[0.04, 0.18, -0.015]}>
-      <mesh castShadow receiveShadow position={[0, 0, -thickness * 0.72]}>
-        <boxGeometry args={[totalW, coverH, thickness]} />
-        <meshStandardMaterial color="#e7dfd2" roughness={0.78} metalness={0.02} />
-      </mesh>
-
-      <mesh castShadow receiveShadow position={[-coverW / 2, 0, 0.006]}>
-        <boxGeometry args={[spineW, coverH * 1.01, thickness * 1.25]} />
-        <meshStandardMaterial color="#b9ad9a" roughness={0.86} metalness={0.02} />
-      </mesh>
-
-      <mesh castShadow receiveShadow position={[spineW / 2, 0, 0.035]}>
-        <boxGeometry args={[coverW, coverH, thickness * 0.36]} />
-        <meshStandardMaterial color="#d5cab8" roughness={0.74} metalness={0.02} />
-      </mesh>
-
-      <Html transform center position={[spineW / 2, 0, 0.105]} distanceFactor={1.02} occlude={false}>
-        <Preview3DCoverDom page={page} photoMap={photoMap} domW={domW} domH={domH} spinePx={spinePx} />
-      </Html>
-    </group>
-  );
-}
-
-function OpenAlbum3D({ page, photoMap }) {
-  const { spreadW, spreadH, spineW, thickness } = getPreviewBookSize(page);
-  const domW = Math.round(spreadW * 168);
-  const domH = Math.round(spreadH * 168);
-
-  return (
-    <group rotation={[-0.84, 0.02, 0]} position={[0, -0.26, 0.18]}>
-      <mesh castShadow receiveShadow position={[-spreadW * 0.25, 0, -0.055]} rotation={[0, 0.06, 0]}>
-        <boxGeometry args={[spreadW / 2, spreadH, thickness]} />
-        <meshStandardMaterial color="#fffdf8" roughness={0.55} metalness={0.015} />
-      </mesh>
-
-      <mesh castShadow receiveShadow position={[spreadW * 0.25, 0, -0.055]} rotation={[0, -0.06, 0]}>
-        <boxGeometry args={[spreadW / 2, spreadH, thickness]} />
-        <meshStandardMaterial color="#fffdf8" roughness={0.55} metalness={0.015} />
-      </mesh>
-
-      <mesh castShadow receiveShadow position={[0, 0, -0.006]}>
-        <boxGeometry args={[Math.max(spineW, 0.075), spreadH * 1.02, thickness * 1.22]} />
-        <meshStandardMaterial color="#d2c9ba" roughness={0.9} />
-      </mesh>
-
-      <mesh position={[0, 0, 0.028]}>
-        <boxGeometry args={[0.016, spreadH * 1.02, thickness * 1.26]} />
-        <meshStandardMaterial color="#b8b0a3" roughness={0.95} />
-      </mesh>
-
-      <Html transform center position={[0, 0, 0.065]} distanceFactor={1.02} occlude={false}>
-        <Preview3DSpreadDom spread={page.spread} photoMap={photoMap} domW={domW} domH={domH} />
-      </Html>
-
-      <TurningPageHint width={spreadW} height={spreadH} />
-    </group>
-  );
-}
-
-function TurningPageHint({ width, height }) {
-  const ref = useRef(null);
-  useFrame((state) => {
-    if (!ref.current) return;
-    const wave = (Math.sin(state.clock.elapsedTime * 1.6) + 1) / 2;
-    ref.current.rotation.y = -0.15 - wave * 0.18;
-    ref.current.position.z = 0.075 + wave * 0.015;
-  });
-
-  return (
-    <mesh ref={ref} position={[0.16, 0, 0.075]} rotation={[0, -0.18, 0]} castShadow>
-      <boxGeometry args={[width * 0.48, height * 0.985, 0.008]} />
-      <meshStandardMaterial color="#fffaf1" roughness={0.62} transparent opacity={0.28} />
+    <mesh position={[x, y, z]} castShadow={false} receiveShadow={false}>
+      <planeGeometry args={[w, h]} />
+      {texture ? (
+        <meshStandardMaterial map={texture} roughness={0.48} metalness={0.0} side={THREE.FrontSide} toneMapped={false} />
+      ) : (
+        <meshStandardMaterial color="#d9d4ca" roughness={0.7} side={THREE.FrontSide} />
+      )}
     </mesh>
   );
 }
 
-function Preview3DCoverDom({ page, photoMap, domW = 330, domH = 215, spinePx = 28 }) {
-  const photo = page.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
-  const posX = clamp(50 + (page.cover?.cropX || 0) * 0.5, 0, 100);
-  const posY = clamp(50 + (page.cover?.cropY || 0) * 0.5, 0, 100);
-  const scale = page.cover?.cropScale || 1;
+function RigidAlbum3D({ page, targetPage, turn, photoMap, onTurnDone }) {
+  const groupRef = useRef(null);
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.55) * 0.012;
+  });
+
+  if (!page) return null;
+  const basePage = targetPage || page;
+
   return (
-    <div
-      className="preview3d-cover-dom"
-      style={{ width: `${domW}px`, height: `${domH}px`, gridTemplateColumns: `${spinePx}px minmax(0, 1fr)` }}
-    >
-      <div className="preview3d-cover-spine-dom" style={{ background: page.texture?.css }} />
-      <div className="preview3d-cover-photo-dom">
-        {photo ? (
-          <img src={photo.src} alt="" draggable="false" style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }} />
-        ) : <span>Sem foto na capa</span>}
-      </div>
-    </div>
+    <group ref={groupRef} position={[0, -0.08, 0]} rotation={[0.02, -0.18, 0]}>
+      {page.type === "cover" && !turn ? (
+        <ClosedRigidAlbum3D page={page} photoMap={photoMap} />
+      ) : (
+        <OpenRigidAlbum3D page={basePage?.type === "spread" ? basePage : page} photoMap={photoMap} />
+      )}
+      {turn && page.type === "spread" && (
+        <TurningRigidSpread page={page} photoMap={photoMap} direction={turn.direction} onDone={onTurnDone} />
+      )}
+      {turn && page.type === "cover" && targetPage?.type === "spread" && (
+        <CoverOpeningBoard page={page} photoMap={photoMap} onDone={onTurnDone} />
+      )}
+    </group>
   );
 }
 
-function Preview3DSpreadDom({ spread, photoMap, domW = 540, domH = 275 }) {
+function ClosedRigidAlbum3D({ page, photoMap }) {
+  const { coverW, coverH, spineW, coverThickness, blockThickness } = getPreviewBookSize(page);
+  const coverColor = getTextureColor(page.texture);
+  const photo = page.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+  const frontW = coverW * 0.9;
+  const frontH = coverH * 0.88;
+
   return (
-    <div className="preview3d-spread-dom" style={{ width: `${domW}px`, height: `${domH}px` }}>
-      {(spread?.frames || []).length ? spread.frames.map((frame) => {
+    <group rotation={[0.02, 0.18, -0.01]}>
+      <mesh castShadow receiveShadow position={[0, 0, -blockThickness * 0.48]}>
+        <boxGeometry args={[coverW + spineW, coverH, blockThickness]} />
+        <meshStandardMaterial color="#f7f2e8" roughness={0.82} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[-coverW / 2, 0, 0.012]}>
+        <boxGeometry args={[spineW, coverH * 1.03, coverThickness * 1.55]} />
+        <meshStandardMaterial color={coverColor} roughness={0.88} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[spineW / 2, 0, 0.035]}>
+        <boxGeometry args={[coverW, coverH, coverThickness]} />
+        <meshStandardMaterial color={coverColor} roughness={0.82} />
+      </mesh>
+      <mesh position={[spineW / 2, 0, 0.075]} castShadow>
+        <planeGeometry args={[frontW, frontH]} />
+        <meshStandardMaterial color="#f2eadb" roughness={0.62} />
+      </mesh>
+      {photo ? (
+        <PhotoPlane src={photo.src} x={spineW / 2} y={0} w={frontW * 0.92} h={frontH * 0.92} z={0.083} cropX={page.cover?.cropX} cropY={page.cover?.cropY} cropScale={page.cover?.cropScale} />
+      ) : null}
+    </group>
+  );
+}
+
+function OpenRigidAlbum3D({ page, photoMap }) {
+  const { spreadW, spreadH, spineW, pageThickness, blockThickness } = getPreviewBookSize(page);
+  return (
+    <group rotation={[-0.78, 0.02, 0]} position={[0, -0.26, 0.12]}>
+      <mesh castShadow receiveShadow position={[-0.08, 0, -0.11]}>
+        <boxGeometry args={[spreadW * 0.98, spreadH * 1.02, blockThickness]} />
+        <meshStandardMaterial color="#ece6da" roughness={0.9} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0, 0, -0.035]}>
+        <boxGeometry args={[Math.max(spineW, 0.08), spreadH * 1.04, blockThickness * 1.12]} />
+        <meshStandardMaterial color="#c7bbab" roughness={0.94} />
+      </mesh>
+      <RigidSpreadBoard page={page} photoMap={photoMap} width={spreadW} height={spreadH} thickness={pageThickness} z={0.025} />
+    </group>
+  );
+}
+
+function RigidSpreadBoard({ page, photoMap, width, height, thickness, z = 0 }) {
+  const spread = page?.spread;
+  return (
+    <group position={[0, 0, z]}>
+      <mesh castShadow receiveShadow position={[0, 0, 0]}>
+        <boxGeometry args={[width, height, thickness]} />
+        <meshStandardMaterial color="#fffdf8" roughness={0.57} metalness={0.012} />
+      </mesh>
+      <mesh position={[-width / 4, 0, thickness / 2 + 0.003]}>
+        <planeGeometry args={[width / 2 - 0.018, height - 0.018]} />
+        <meshStandardMaterial color="#fffaf2" roughness={0.54} side={THREE.FrontSide} />
+      </mesh>
+      <mesh position={[width / 4, 0, thickness / 2 + 0.003]}>
+        <planeGeometry args={[width / 2 - 0.018, height - 0.018]} />
+        <meshStandardMaterial color="#fffaf2" roughness={0.54} side={THREE.FrontSide} />
+      </mesh>
+      {(spread?.frames || []).map((frame) => {
         const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
-        const posX = clamp(50 + (frame.cropX || 0) * 0.5, 0, 100);
-        const posY = clamp(50 + (frame.cropY || 0) * 0.5, 0, 100);
-        const scale = frame.cropScale || 1;
+        const fw = (frame.w / 100) * width;
+        const fh = (frame.h / 100) * height;
+        const fx = -width / 2 + ((frame.x + frame.w / 2) / 100) * width;
+        const fy = height / 2 - ((frame.y + frame.h / 2) / 100) * height;
         return (
-          <div key={frame.id} className="preview3d-frame-dom" style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}>
-            {photo ? (
-              <img src={photo.src} alt="" draggable="false" style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }} />
-            ) : <div className="preview3d-empty-frame" />}
-          </div>
+          <PhotoPlane
+            key={frame.id}
+            src={photo?.src}
+            x={fx}
+            y={fy}
+            w={fw}
+            h={fh}
+            z={thickness / 2 + 0.009}
+            cropX={frame.cropX}
+            cropY={frame.cropY}
+            cropScale={frame.cropScale}
+          />
         );
-      }) : <div className="preview3d-empty-spread">Lâmina em branco</div>}
-    </div>
+      })}
+      <mesh position={[0, 0, thickness / 2 + 0.014]}>
+        <boxGeometry args={[0.012, height * 1.01, 0.006]} />
+        <meshStandardMaterial color="#d5cfc3" roughness={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
+function TurningRigidSpread({ page, photoMap, direction = 1, onDone }) {
+  const { spreadW, spreadH, pageThickness } = getPreviewBookSize(page);
+  const pivotRef = useRef(null);
+  const progressRef = useRef(0);
+  const doneRef = useRef(false);
+  const hingeX = direction > 0 ? -spreadW / 2 : spreadW / 2;
+  const innerX = direction > 0 ? spreadW / 2 : -spreadW / 2;
+
+  useEffect(() => {
+    progressRef.current = 0;
+    doneRef.current = false;
+  }, [page?.id, direction]);
+
+  useFrame((_, delta) => {
+    if (!pivotRef.current || doneRef.current) return;
+    progressRef.current = Math.min(1, progressRef.current + delta * 1.05);
+    const t = progressRef.current;
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    pivotRef.current.rotation.y = direction > 0 ? -Math.PI * eased : Math.PI * eased;
+    pivotRef.current.position.z = 0.09 + Math.sin(eased * Math.PI) * 0.18;
+    if (progressRef.current >= 1) {
+      doneRef.current = true;
+      setTimeout(() => onDone?.(), 0);
+    }
+  });
+
+  return (
+    <group rotation={[-0.78, 0.02, 0]} position={[hingeX, -0.26, 0.19]} ref={pivotRef}>
+      <group position={[innerX, 0, 0]}>
+        <RigidSpreadBoard page={page} photoMap={photoMap} width={spreadW} height={spreadH} thickness={pageThickness * 1.18} z={0} />
+      </group>
+    </group>
+  );
+}
+
+function CoverOpeningBoard({ page, photoMap, onDone }) {
+  const { coverW, coverH, spineW, coverThickness } = getPreviewBookSize(page);
+  const pivotRef = useRef(null);
+  const progressRef = useRef(0);
+  const doneRef = useRef(false);
+  const coverColor = getTextureColor(page.texture);
+  const photo = page.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+
+  useFrame((_, delta) => {
+    if (!pivotRef.current || doneRef.current) return;
+    progressRef.current = Math.min(1, progressRef.current + delta * 1.05);
+    const t = progressRef.current;
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    pivotRef.current.rotation.y = -Math.PI * 0.82 * eased;
+    pivotRef.current.position.z = 0.12 + Math.sin(eased * Math.PI) * 0.15;
+    if (progressRef.current >= 1) {
+      doneRef.current = true;
+      setTimeout(() => onDone?.(), 0);
+    }
+  });
+
+  return (
+    <group rotation={[-0.78, 0.02, 0]} position={[-coverW / 2, -0.26, 0.23]} ref={pivotRef}>
+      <group position={[coverW / 2, 0, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[coverW + spineW * 0.25, coverH, coverThickness]} />
+          <meshStandardMaterial color={coverColor} roughness={0.82} />
+        </mesh>
+        {photo && <PhotoPlane src={photo.src} x={spineW * 0.12} y={0} w={coverW * 0.82} h={coverH * 0.82} z={coverThickness / 2 + 0.01} cropX={page.cover?.cropX} cropY={page.cover?.cropY} cropScale={page.cover?.cropScale} />}
+      </group>
+    </group>
   );
 }
 
@@ -2208,7 +2347,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
           <>
             <h2>Pré-visualização 3D</h2>
             <Preview3D pages={modal.pages || []} photoMap={photoMap} />
-            <p>Use as setas na tela ou as teclas ← e → para folhear. Use o mouse para girar, aproximar e afastar o álbum.</p>
+            <p>Use as setas na tela ou as teclas ← e → para folhear. As lâminas viram como placas rígidas de álbum 800g. Use o mouse para girar, aproximar e afastar.</p>
           </>
         )}
         {modal.type === "finalize" && (
