@@ -1,6 +1,1 @@
-Diagramador Picmimos V4 - Meia Capa Fotografica
-- Sem Tailwind/PostCSS obrigatório
-- Capa com frente editável e verso/lombada texturizados
-- Miolo começa em branco
-- Formatos e quantidade de páginas configuráveis
-- Exportação simulada para produção
+V5 - upload direto na capa, texto editável, troca de fotos por arraste, zoom e enquadramento manual.

@@ -213,3 +213,114 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
   .workspace { min-height: 520px; }
   .filmstrip { min-height: 184px; }
 }
+
+
+/* Ajustes V5: capa obrigatória, troca por arraste e texto editável */
+.cover-front.needs-photo {
+  display: grid;
+  place-items: center;
+}
+
+.cover-upload-zone {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f4ed, #ded5c8);
+  border: 2px dashed rgba(120,100,80,.38);
+  z-index: 4;
+}
+
+.cover-upload-button,
+.cover-selected-button,
+.cover-change-button {
+  border: 0;
+  border-radius: 18px;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0,0,0,.14);
+}
+
+.cover-upload-button {
+  background: #fff;
+  color: #3f3934;
+  min-width: 220px;
+  padding: 22px 24px;
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  text-align: center;
+}
+
+.cover-upload-button span {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--gold-2);
+  color: #2c2824;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.cover-upload-button strong {
+  font-size: 15px;
+}
+
+.cover-upload-button small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cover-selected-button {
+  background: #2c2824;
+  color: #fff;
+  padding: 11px 18px;
+  font-weight: 850;
+}
+
+.cover-change-button {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 40;
+  background: rgba(255,255,255,.92);
+  color: #2c2824;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.text-box.selected {
+  z-index: 60;
+}
+
+.text-box [contenteditable="true"] {
+  outline: none;
+}
+
+.text-box [contenteditable="true"]:focus {
+  box-shadow: inset 0 -2px 0 rgba(245,202,99,.95);
+}
+
+.text-controls small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.text-controls .btn.danger {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.frame {
+  touch-action: none;
+}
+
+.cover-front {
+  touch-action: none;
+}

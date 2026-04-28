@@ -25,6 +25,17 @@ const TEXTURES = [
   { id: "branco", label: "Courino Branco", css: "linear-gradient(135deg, #eeeeee 0%, #ffffff 45%, #d7d7d7 100%)" },
 ];
 
+const TEXT_FONTS = [
+  { value: "Arial, Helvetica, sans-serif", label: "Arial" },
+  { value: "Georgia, serif", label: "Georgia" },
+  { value: "Playfair Display, Georgia, serif", label: "Playfair" },
+  { value: "Montserrat, Arial, sans-serif", label: "Montserrat" },
+  { value: "Great Vibes, cursive", label: "Cursiva" },
+  { value: "Cinzel, Georgia, serif", label: "Cinzel" },
+];
+
+const TEXT_COLORS = ["#222222", "#ffffff", "#d9a441", "#5b5b5b", "#244236", "#9d2f2f"];
+
 const DEMO_PHOTOS = [
   "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
   "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1200&q=80",
@@ -50,6 +61,32 @@ function clamp(value, min, max) {
 
 function makeDemoPhotos() {
   return DEMO_PHOTOS.map((src, index) => ({ id: uid("demo"), src, name: `Foto demo ${index + 1}` }));
+}
+
+function loadImageFiles(files) {
+  const list = Array.from(files || []).filter((file) => file.type?.startsWith("image/"));
+  if (!list.length) return Promise.resolve([]);
+  return Promise.all(list.map((file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ id: uid("photo"), src: reader.result, name: file.name });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  })));
+}
+
+function makeText(overrides = {}) {
+  return {
+    id: uid("text"),
+    value: "Digite seu texto",
+    x: 50,
+    y: 50,
+    size: 26,
+    color: "#ffffff",
+    fontFamily: TEXT_FONTS[0].value,
+    weight: 800,
+    align: "center",
+    ...overrides,
+  };
 }
 
 function createBlankSpread(index) {
@@ -179,10 +216,12 @@ export default function App() {
   const [spreads, setSpreads] = useState(() => buildBlankSpreads(20));
   const [active, setActive] = useState({ type: "cover", index: 0 });
   const [selectedFrameId, setSelectedFrameId] = useState(null);
+  const [selectedTextId, setSelectedTextId] = useState(null);
   const [showSafety, setShowSafety] = useState(true);
   const [modal, setModal] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
   const fileInputRef = useRef(null);
+  const coverFileInputRef = useRef(null);
   const stageRef = useRef(null);
 
   const format = useMemo(() => FORMATS.find((item) => item.id === formatId) || FORMATS[3], [formatId]);
@@ -217,16 +256,20 @@ export default function App() {
   }
 
   async function importFiles(files) {
-    const list = Array.from(files || []).filter((file) => file.type?.startsWith("image/"));
-    if (!list.length) return;
-    const loaded = await Promise.all(list.map((file) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve({ id: uid("photo"), src: reader.result, name: file.name });
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    })));
+    const loaded = await loadImageFiles(files);
+    if (!loaded.length) return;
     setPhotos((prev) => [...prev, ...loaded]);
     setSelectedPhotoIds(loaded.slice(0, 8).map((p) => p.id));
+  }
+
+  async function importCoverFiles(files) {
+    const loaded = await loadImageFiles(files);
+    if (!loaded.length) return;
+    const coverPhoto = loaded[0];
+    setPhotos((prev) => [...prev, ...loaded]);
+    setSelectedPhotoIds([coverPhoto.id]);
+    applyPhotoToCover(coverPhoto.id);
+    if (coverFileInputRef.current) coverFileInputRef.current.value = "";
   }
 
   function loadDemo() {
@@ -254,11 +297,17 @@ export default function App() {
     setSelectedPhotoIds((prev) => prev.includes(photoId) && prev.length === 1 ? [] : [photoId]);
   }
 
+  function applyPhotoToCover(photoId) {
+    if (!photoId) return;
+    setCover((prev) => ({ ...prev, photoId, cropScale: 1, cropX: 0, cropY: 0 }));
+    setActive({ type: "cover", index: 0 });
+    setSelectedFrameId(null);
+  }
+
   function applySelectedToCover() {
     const id = selectedPhotoIds[0];
     if (!id) return alert("Selecione uma foto no rodapé primeiro.");
-    setCover((prev) => ({ ...prev, photoId: id, cropScale: 1, cropX: 0, cropY: 0 }));
-    setActive({ type: "cover", index: 0 });
+    applyPhotoToCover(id);
   }
 
   function autoBuildCurrentSpread() {
@@ -318,12 +367,67 @@ export default function App() {
   }
 
   function addText() {
-    const text = { id: uid("text"), value: "Seu texto aqui", x: 50, y: 50, size: 24, color: "#ffffff" };
+    const text = active.type === "cover"
+      ? makeText({ color: "#ffffff", size: 28 })
+      : makeText({ color: "#222222", size: 24 });
+
     if (active.type === "cover") {
       setCover((prev) => ({ ...prev, texts: [...prev.texts, text] }));
+      setSelectedTextId({ scope: "cover", id: text.id });
     } else {
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, texts: [...spread.texts, { ...text, color: "#222222" }] } : spread));
+      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, texts: [...spread.texts, text] } : spread));
+      setSelectedTextId({ scope: "spread", spreadIndex: active.index, id: text.id });
     }
+    setSelectedFrameId(null);
+  }
+
+  function updateText(textId, patch, scope = active.type, spreadIndex = active.index) {
+    if (scope === "cover") {
+      setCover((prev) => ({ ...prev, texts: prev.texts.map((text) => text.id === textId ? { ...text, ...patch } : text) }));
+      return;
+    }
+    setSpreads((prev) => prev.map((spread, index) => index === spreadIndex ? {
+      ...spread,
+      texts: spread.texts.map((text) => text.id === textId ? { ...text, ...patch } : text),
+    } : spread));
+  }
+
+  function updateSelectedText(patch) {
+    if (!selectedTextId) return;
+    updateText(selectedTextId.id, patch, selectedTextId.scope, selectedTextId.spreadIndex);
+  }
+
+  function removeSelectedText() {
+    if (!selectedTextId) return;
+    if (selectedTextId.scope === "cover") {
+      setCover((prev) => ({ ...prev, texts: prev.texts.filter((text) => text.id !== selectedTextId.id) }));
+    } else {
+      setSpreads((prev) => prev.map((spread, index) => index === selectedTextId.spreadIndex ? {
+        ...spread,
+        texts: spread.texts.filter((text) => text.id !== selectedTextId.id),
+      } : spread));
+    }
+    setSelectedTextId(null);
+  }
+
+  function startTextMove(event, text, scope, spreadIndex) {
+    event.preventDefault();
+    event.stopPropagation();
+    const area = event.currentTarget.closest(scope === "cover" ? ".cover-front" : ".spread-layout");
+    if (!area) return;
+    const rect = area.getBoundingClientRect();
+    const move = (moveEvent) => {
+      const x = clamp(((moveEvent.clientX - rect.left) / rect.width) * 100, 2, 98);
+      const y = clamp(((moveEvent.clientY - rect.top) / rect.height) * 100, 2, 98);
+      updateText(text.id, { x: round(x), y: round(y) }, scope, spreadIndex);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    setSelectedTextId(scope === "cover" ? { scope: "cover", id: text.id } : { scope: "spread", spreadIndex, id: text.id });
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 
   function clearActive() {
@@ -331,7 +435,9 @@ export default function App() {
       setCover((prev) => ({ ...prev, photoId: null, cropScale: 1, cropX: 0, cropY: 0, texts: [] }));
     } else {
       setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: [], texts: [] } : spread));
+      setSelectedFrameId(null);
     }
+    setSelectedTextId(null);
   }
 
   function updateCoverCrop(patch) {
@@ -346,28 +452,89 @@ export default function App() {
     }));
   }
 
+  function applyPhotoToFrame(spreadIndex, frameId, photoId) {
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== spreadIndex) return spread;
+      return {
+        ...spread,
+        frames: spread.frames.map((frame) => frame.id === frameId ? { ...frame, photoId, cropScale: 1, cropX: 0, cropY: 0 } : frame),
+      };
+    }));
+    setSelectedFrameId(frameId);
+    setSelectedTextId(null);
+  }
+
   function handleDrop(event) {
     event.preventDefault();
     const photoId = event.dataTransfer.getData("photo/id");
     if (!photoId) return;
     if (active.type === "cover") {
-      setCover((prev) => ({ ...prev, photoId, cropScale: 1, cropX: 0, cropY: 0 }));
+      applyPhotoToCover(photoId);
     } else {
       const ids = Array.from(new Set([photoId, ...selectedPhotoIds])).slice(0, 20);
       setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
     }
   }
 
+  function startPhotoPan(event, target, frameId = null, frameSnapshot = null) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const initial = target === "cover"
+      ? { cropX: cover.cropX || 0, cropY: cover.cropY || 0 }
+      : { cropX: frameSnapshot?.cropX || 0, cropY: frameSnapshot?.cropY || 0 };
+
+    const move = (moveEvent) => {
+      const dx = ((moveEvent.clientX - startX) / rect.width) * 100;
+      const dy = ((moveEvent.clientY - startY) / rect.height) * 100;
+      const patch = {
+        cropX: round(clamp(initial.cropX + dx, -80, 80)),
+        cropY: round(clamp(initial.cropY + dy, -80, 80)),
+      };
+      if (target === "cover") {
+        updateCoverCrop(patch);
+      } else {
+        setSpreads((prev) => prev.map((spread, sIndex) => {
+          if (sIndex !== active.index) return spread;
+          return { ...spread, frames: spread.frames.map((frame) => frame.id === frameId ? { ...frame, ...patch } : frame) };
+        }));
+      }
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function zoomPhoto(event, target, frame = null) {
+    event.preventDefault();
+    const delta = event.deltaY < 0 ? 0.08 : -0.08;
+    if (target === "cover") {
+      updateCoverCrop({ cropScale: round(clamp((cover.cropScale || 1) + delta, 0.6, 3)) });
+      return;
+    }
+    if (!frame) return;
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== active.index) return spread;
+      return { ...spread, frames: spread.frames.map((item) => item.id === frame.id ? { ...item, cropScale: round(clamp((item.cropScale || 1) + delta, 0.6, 3)) } : item) };
+    }));
+  }
+
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v4", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V4",
+      version: "V5",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -420,6 +587,11 @@ export default function App() {
 
   const activeLabel = active.type === "cover" ? "Capa" : currentSpread?.name;
   const currentPhotoForPanel = active.type === "cover" ? photoMap.get(cover.photoId) : selectedFrame?.photoId ? photoMap.get(selectedFrame.photoId) : null;
+  const selectedText = selectedTextId?.scope === "cover" && active.type === "cover"
+    ? cover.texts.find((text) => text.id === selectedTextId.id)
+    : selectedTextId?.scope === "spread" && active.type === "spread" && selectedTextId.spreadIndex === active.index
+      ? currentSpread?.texts.find((text) => text.id === selectedTextId.id)
+      : null;
 
   return (
     <div className="app-shell">
@@ -427,8 +599,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V4</strong>
-            <span>Meia Capa Fotográfica · visual/funcional</span>
+            <strong>Diagramador Picmimos V5</strong>
+            <span>Meia Capa Fotográfica · upload de capa + texto editável</span>
           </div>
         </div>
         <div className="top-actions">
@@ -482,9 +654,9 @@ export default function App() {
             <span>{active.type === "cover" ? "Frente editável + verso/lombada texturizados" : `${format.spreadW} x ${format.spreadH} cm · Fuji UV Fosco`}</span>
           </div>
           <div className="toolbar-actions">
-            <Button variant="secondary" onClick={active.type === "cover" ? applySelectedToCover : autoBuildCurrentSpread}>{active.type === "cover" ? "Usar foto na capa" : "Montar automático"}</Button>
-            <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>
-            <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>
+            {active.type === "spread" && <Button variant="secondary" onClick={autoBuildCurrentSpread}>Montar automático</Button>}
+            {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>}
+            {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>}
             <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Margem 0,3 cm</Button>
             <Button variant="secondary" onClick={addText}>Texto</Button>
             <Button variant="danger" onClick={clearActive}>Limpar</Button>
@@ -494,9 +666,39 @@ export default function App() {
         <div className="stage-holder" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
           <div ref={stageRef} className={`stage ${active.type}`} style={{ aspectRatio: activeAspect }}>
             {active.type === "cover" ? (
-              <CoverStage cover={cover} photoMap={photoMap} texture={texture} format={format} spineCm={spineCm} showSafety={showSafety} />
+              <CoverStage
+                cover={cover}
+                photoMap={photoMap}
+                texture={texture}
+                format={format}
+                spineCm={spineCm}
+                showSafety={showSafety}
+                selectedPhotoIds={selectedPhotoIds}
+                onPickCoverPhoto={() => coverFileInputRef.current?.click()}
+                onUseSelected={(photoId) => photoId ? applyPhotoToCover(photoId) : applySelectedToCover()}
+                onPhotoPan={startPhotoPan}
+                onPhotoWheel={zoomPhoto}
+                selectedTextId={selectedTextId}
+                onSelectText={setSelectedTextId}
+                onMoveText={startTextMove}
+                onChangeText={updateText}
+              />
             ) : (
-              <SpreadStage spread={currentSpread} photoMap={photoMap} showSafety={showSafety} onSelectFrame={setSelectedFrameId} selectedFrameId={selectedFrameId} />
+              <SpreadStage
+                spread={currentSpread}
+                spreadIndex={active.index}
+                photoMap={photoMap}
+                showSafety={showSafety}
+                onSelectFrame={(id) => { setSelectedFrameId(id); setSelectedTextId(null); }}
+                selectedFrameId={selectedFrameId}
+                onDropPhoto={applyPhotoToFrame}
+                onPhotoPan={startPhotoPan}
+                onPhotoWheel={zoomPhoto}
+                selectedTextId={selectedTextId}
+                onSelectText={setSelectedTextId}
+                onMoveText={startTextMove}
+                onChangeText={updateText}
+              />
             )}
           </div>
         </div>
@@ -505,12 +707,14 @@ export default function App() {
       <aside className="right-panel">
         <section className="panel-card">
           <h3>Ajustes</h3>
-          {active.type === "cover" ? (
-            <CropControls label="Foto da capa" photo={currentPhotoForPanel} target={cover} onChange={updateCoverCrop} />
+          {selectedText ? (
+            <TextControls text={selectedText} onChange={updateSelectedText} onRemove={removeSelectedText} />
+          ) : active.type === "cover" ? (
+            <CropControls label="Foto da capa" photo={currentPhotoForPanel} target={cover} onChange={updateCoverCrop} emptyText="Clique no ícone de upload dentro da capa ou arraste uma foto para a frente." />
           ) : selectedFrame ? (
             <CropControls label="Foto selecionada" photo={currentPhotoForPanel} target={selectedFrame} onChange={updateFrameCrop} />
           ) : (
-            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom e enquadramento.</div>
+            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom/enquadramento, ou arraste outra foto para trocar.</div>
           )}
         </section>
 
@@ -569,17 +773,35 @@ export default function App() {
       </section>
 
       <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => importFiles(e.target.files)} />
+      <input ref={coverFileInputRef} type="file" accept="image/*" hidden onChange={(e) => importCoverFiles(e.target.files)} />
       {modal && <Modal modal={modal} onClose={() => setModal(null)} onExport={simulatedExport} />}
     </div>
   );
 }
 
-function CoverStage({ cover, photoMap, texture, format, spineCm, showSafety }) {
+function CoverStage({
+  cover,
+  photoMap,
+  texture,
+  format,
+  spineCm,
+  showSafety,
+  selectedPhotoIds,
+  onPickCoverPhoto,
+  onUseSelected,
+  onPhotoPan,
+  onPhotoWheel,
+  selectedTextId,
+  onSelectText,
+  onMoveText,
+  onChangeText,
+}) {
   const photo = cover.photoId ? photoMap.get(cover.photoId) : null;
   const total = format.closedW * 2 + spineCm;
   const backPct = (format.closedW / total) * 100;
   const spinePct = (spineCm / total) * 100;
   const frontPct = backPct;
+
   return (
     <div className="cover-layout">
       <div className="cover-back" style={{ width: `${backPct}%`, background: texture.css }}>
@@ -588,16 +810,71 @@ function CoverStage({ cover, photoMap, texture, format, spineCm, showSafety }) {
       <div className="cover-spine" style={{ width: `${spinePct}%`, minWidth: 8, background: texture.css }}>
         <span>{(spineCm * 10).toFixed(0)}mm</span>
       </div>
-      <div className="cover-front" style={{ width: `${frontPct}%` }}>
-        {photo ? <Photo src={photo.src} frame={cover} /> : <div className="cover-empty">Foto da capa frontal</div>}
+      <div
+        className={`cover-front ${!photo ? "needs-photo" : ""}`}
+        style={{ width: `${frontPct}%` }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const photoId = event.dataTransfer.getData("photo/id");
+          if (photoId) {
+            onUseSelected(photoId);
+          }
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onWheel={(event) => photo && onPhotoWheel(event, "cover")}
+        onPointerDown={(event) => photo && onPhotoPan(event, "cover")}
+      >
+        {photo ? <Photo src={photo.src} frame={cover} /> : (
+          <div className="cover-upload-zone" onPointerDown={(event) => event.stopPropagation()}>
+            <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto} title="Enviar foto da capa">
+              <span>☁</span>
+              <strong>Enviar foto da capa</strong>
+              <small>Obrigatório para finalizar este modelo</small>
+            </button>
+            {selectedPhotoIds?.length ? (
+              <button type="button" className="cover-selected-button" onClick={() => onUseSelected()}>
+                Usar foto selecionada
+              </button>
+            ) : null}
+          </div>
+        )}
+        {photo && (
+          <button type="button" className="cover-change-button" onClick={onPickCoverPhoto} onPointerDown={(event) => event.stopPropagation()}>
+            Trocar foto
+          </button>
+        )}
         {showSafety && <div className="safety cover-safe">Margem de segurança 0,3 cm</div>}
-        {cover.texts.map((text) => <TextBox key={text.id} text={text} />)}
+        {cover.texts.map((text) => (
+          <TextBox
+            key={text.id}
+            text={text}
+            scope="cover"
+            selected={selectedTextId?.scope === "cover" && selectedTextId?.id === text.id}
+            onSelect={() => onSelectText({ scope: "cover", id: text.id })}
+            onMove={(event) => onMoveText(event, text, "cover", 0)}
+            onChange={(value) => onChangeText(text.id, { value }, "cover", 0)}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function SpreadStage({ spread, photoMap, showSafety, onSelectFrame, selectedFrameId }) {
+function SpreadStage({
+  spread,
+  spreadIndex,
+  photoMap,
+  showSafety,
+  onSelectFrame,
+  selectedFrameId,
+  onDropPhoto,
+  onPhotoPan,
+  onPhotoWheel,
+  selectedTextId,
+  onSelectText,
+  onMoveText,
+  onChangeText,
+}) {
   return (
     <div className="spread-layout">
       <div className="page-label left">Página esquerda</div>
@@ -608,43 +885,177 @@ function SpreadStage({ spread, photoMap, showSafety, onSelectFrame, selectedFram
         const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
         return (
           <button
+            type="button"
             key={frame.id}
             className={`frame ${selectedFrameId === frame.id ? "selected" : ""}`}
             style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
             onClick={() => onSelectFrame(frame.id)}
+            onDrop={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const photoId = event.dataTransfer.getData("photo/id");
+              if (photoId) onDropPhoto(spreadIndex, frame.id, photoId);
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onPointerDown={(event) => {
+              onSelectFrame(frame.id);
+              if (photo) onPhotoPan(event, "frame", frame.id, frame);
+            }}
+            onWheel={(event) => onPhotoWheel(event, "frame", frame)}
+            title="Arraste outra foto para trocar. Use a rolagem do mouse para aproximar."
           >
             <Photo src={photo?.src} frame={frame} />
             <span>{index + 1}</span>
           </button>
         );
       }) : <div className="blank-spread-message">Lâmina em branco. Selecione fotos e clique em “Montar automático”.</div>}
-      {spread?.texts?.map((text) => <TextBox key={text.id} text={text} />)}
+      {spread?.texts?.map((text) => (
+        <TextBox
+          key={text.id}
+          text={text}
+          scope="spread"
+          selected={selectedTextId?.scope === "spread" && selectedTextId?.spreadIndex === spreadIndex && selectedTextId?.id === text.id}
+          onSelect={() => onSelectText({ scope: "spread", spreadIndex, id: text.id })}
+          onMove={(event) => onMoveText(event, text, "spread", spreadIndex)}
+          onChange={(value) => onChangeText(text.id, { value }, "spread", spreadIndex)}
+        />
+      ))}
     </div>
   );
 }
 
-function TextBox({ text }) {
+function TextBox({ text, scope, selected, onSelect, onMove, onChange }) {
   return (
-    <div className="text-box" style={{ left: `${text.x}%`, top: `${text.y}%`, fontSize: text.size, color: text.color }}>
-      {text.value}
+    <div
+      className={`text-box ${selected ? "selected" : ""}`}
+      style={{
+        left: `${text.x}%`,
+        top: `${text.y}%`,
+        fontSize: `${text.size}px`,
+        color: text.color,
+        fontFamily: text.fontFamily,
+        fontWeight: text.weight,
+        textAlign: text.align,
+        pointerEvents: "auto",
+        outline: selected ? "2px solid rgba(245,202,99,.95)" : "1px dashed transparent",
+        borderRadius: 8,
+        padding: "4px 8px",
+        background: selected ? "rgba(255,255,255,.12)" : "transparent",
+      }}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}
+      data-scope={scope}
+    >
+      <button
+        type="button"
+        className="text-move-handle"
+        onPointerDown={onMove}
+        title="Mover texto"
+        style={{
+          display: selected ? "grid" : "none",
+          position: "absolute",
+          left: -14,
+          top: -14,
+          width: 26,
+          height: 26,
+          placeItems: "center",
+          borderRadius: 999,
+          border: "1px solid rgba(0,0,0,.2)",
+          background: "#fff",
+          color: "#2c2824",
+          cursor: "move",
+          boxShadow: "0 4px 14px rgba(0,0,0,.18)",
+          zIndex: 2,
+        }}
+      >
+        ↕
+      </button>
+      <span
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        onInput={(event) => onChange(event.currentTarget.textContent || "")}
+        onPointerDown={(event) => event.stopPropagation()}
+        style={{ cursor: "text", whiteSpace: "pre-wrap", minWidth: 40, display: "inline-block" }}
+      >
+        {text.value}
+      </span>
     </div>
   );
 }
 
-function CropControls({ label, photo, target, onChange }) {
-  if (!photo) return <div className="empty-state">Selecione uma foto no rodapé e aplique aqui.</div>;
+function TextControls({ text, onChange, onRemove }) {
+  return (
+    <div className="text-controls">
+      <label>Texto</label>
+      <input
+        type="text"
+        value={text.value}
+        onChange={(event) => onChange({ value: event.target.value })}
+        placeholder="Digite o texto"
+      />
+
+      <label>Fonte</label>
+      <select value={text.fontFamily} onChange={(event) => onChange({ fontFamily: event.target.value })}>
+        {TEXT_FONTS.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
+      </select>
+
+      <label>Tamanho</label>
+      <input type="range" min="10" max="90" step="1" value={text.size} onChange={(event) => onChange({ size: Number(event.target.value) })} />
+      <small>{text.size}px</small>
+
+      <label>Cor</label>
+      <div className="color-row" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0 10px" }}>
+        {TEXT_COLORS.map((color) => (
+          <button
+            key={color}
+            type="button"
+            onClick={() => onChange({ color })}
+            title={color}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              border: text.color === color ? "3px solid #111" : "1px solid #ccc",
+              background: color,
+              cursor: "pointer",
+            }}
+          />
+        ))}
+        <input type="color" value={text.color} onChange={(event) => onChange({ color: event.target.value })} style={{ width: 42, height: 30, padding: 0 }} />
+      </div>
+
+      <div className="button-grid">
+        <Button variant={text.weight >= 800 ? "active" : "secondary"} onClick={() => onChange({ weight: text.weight >= 800 ? 400 : 900 })}>Negrito</Button>
+        <Button variant="secondary" onClick={() => onChange({ align: text.align === "center" ? "left" : text.align === "left" ? "right" : "center" })}>Alinhar</Button>
+      </div>
+      <Button variant="danger" onClick={onRemove}>Apagar texto</Button>
+      <p className="hint">Clique no texto para escrever. Use o botão redondo ao lado do texto para mover.</p>
+    </div>
+  );
+}
+
+function CropControls({ label, photo, target, onChange, emptyText = "Selecione uma foto no rodapé e aplique aqui." }) {
+  if (!photo) return <div className="empty-state">{emptyText}</div>;
   return (
     <div className="crop-controls">
       <div className="crop-preview">
         <img src={photo.src} alt="" />
       </div>
       <strong>{label}</strong>
+      <p className="hint">Arraste a foto no quadro para reposicionar. Use a rolagem do mouse para aproximar.</p>
       <label>Zoom</label>
       <input type="range" min="0.6" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
       <label>Horizontal</label>
-      <input type="range" min="-60" max="60" step="1" value={target.cropX || 0} onChange={(e) => onChange({ cropX: Number(e.target.value) })} />
+      <input type="range" min="-80" max="80" step="1" value={target.cropX || 0} onChange={(e) => onChange({ cropX: Number(e.target.value) })} />
       <label>Vertical</label>
-      <input type="range" min="-60" max="60" step="1" value={target.cropY || 0} onChange={(e) => onChange({ cropY: Number(e.target.value) })} />
+      <input type="range" min="-80" max="80" step="1" value={target.cropY || 0} onChange={(e) => onChange({ cropY: Number(e.target.value) })} />
       <Button variant="secondary" onClick={() => onChange({ cropScale: 1, cropX: 0, cropY: 0 })}>Centralizar</Button>
     </div>
   );
@@ -657,7 +1068,7 @@ function Modal({ modal, onClose, onExport }) {
         {modal.type === "saved" && (
           <>
             <h2>Projeto salvo</h2>
-            <p>O projeto foi salvo no navegador para teste da V4.</p>
+            <p>O projeto foi salvo no navegador para teste da V5.</p>
           </>
         )}
         {modal.type === "preview" && (
