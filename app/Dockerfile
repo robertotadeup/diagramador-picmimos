@@ -1,4 +1,5 @@
 FROM node:20-alpine AS builder
+# cache-bust: threejs-preview-3d
 
 WORKDIR /app
 
