@@ -378,14 +378,34 @@ function GuideLines({ guides }) {
   );
 }
 
-function Photo({ src, frame }) {
-  if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
+function Photo({ photo, frame, frameAspect = 1 }) {
+  const [loadedImage, setLoadedImage] = useState({ src: null, aspect: null });
+
+  if (!photo?.src) return <div className="empty-photo">Solte uma foto aqui</div>;
+
+  const imageAspect = photo.aspect || (loadedImage.src === photo.src ? loadedImage.aspect : null);
+  const fitByHeight = imageAspect && frameAspect ? imageAspect > frameAspect : false;
+  const imageFitStyle = imageAspect
+    ? (fitByHeight ? { height: "100%", width: "auto" } : { width: "100%", height: "auto" })
+    : { width: "100%", height: "100%", objectFit: "contain" };
+
   return (
     <img
-      src={src}
+      className="photo-layer"
+      src={photo.src}
       alt=""
       draggable="false"
-      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
+      onLoad={(event) => {
+        const img = event.currentTarget;
+        const aspect = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : null;
+        if (aspect && (loadedImage.src !== photo.src || loadedImage.aspect !== aspect)) {
+          setLoadedImage({ src: photo.src, aspect });
+        }
+      }}
+      style={{
+        ...imageFitStyle,
+        transform: `translate(-50%, -50%) translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})`,
+      }}
     />
   );
 }
@@ -1322,6 +1342,7 @@ export default function App() {
                 onMoveText={startTextMove}
                 onResizeText={startTextResize}
                 onChangeText={updateText}
+                format={format}
               />
             )}
           </div>
@@ -1449,7 +1470,7 @@ function CoverStage({
         }}
         onWheel={(event) => photo && onPhotoWheel(event, "cover")}
       >
-        {photo ? <Photo src={photo.src} frame={cover} /> : (
+        {photo ? <Photo photo={photo} frame={cover} frameAspect={format.closedW / format.closedH} /> : (
           <div className="cover-upload-zone">
             <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto}>
               <span>＋</span>
@@ -1503,6 +1524,7 @@ function SpreadStage({
   onMoveText,
   onResizeText,
   onChangeText,
+  format,
 }) {
   const resizeHandles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
@@ -1554,7 +1576,7 @@ function SpreadStage({
                 if (!event.shiftKey && photo) onPhotoPan(event, "frame", frame.id, frame);
               }}
             >
-              <Photo src={photo?.src} frame={frame} />
+              <Photo photo={photo} frame={frame} frameAspect={(frame.w * format.spreadW) / Math.max(0.01, frame.h * format.spreadH)} />
             </div>
             <span>{index + 1}</span>
             {selected && (
