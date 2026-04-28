@@ -1,9 +1,8 @@
-V5.8 - correção cirúrgica do crop mantendo a V5.7
-- Mantida a interface e o comportamento geral da V5.7
-- Corrigida a miniatura da biblioteca lateral para exibir a foto inteira, sem crop
-- Corrigido o enquadramento dentro do container: a imagem agora é camada posicionável atrás da máscara
-- Removido o corte interno causado por object-fit: cover no próprio <img>
-- O container/frame continua sendo a máscara final do corte
-- Arrastar a foto continua reposicionando o enquadramento
-- Botão Mover continua movendo somente o quadro
-- Botão Trocar foto continua separado
+V5.7 - enquadramento livre + troca de fotos entre containers
+- Layouts automáticos priorizando containers horizontal, vertical e quadrado
+- Não força orientação do container pela orientação da foto
+- Foto continua preenchendo o container e pode ser arrastada para centralizar
+- Botão transparente “Trocar foto” para arrastar de um quadro para outro
+- Mover quadro continua separado no botão “Mover”
+- Mantidas guias, alinhamento, textos e espaçamento do layout automático
+- Build validado com Vite
