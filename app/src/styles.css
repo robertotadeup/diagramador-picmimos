@@ -135,7 +135,8 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 .cover-back::after, .cover-spine::after { content: ""; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 1px, transparent 1px 8px); mix-blend-mode: overlay; }
 .cover-spine { border-left: 1px solid rgba(0,0,0,.2); border-right: 1px solid rgba(0,0,0,.2); writing-mode: vertical-rl; text-orientation: mixed; }
 .cover-front { background: #eee; border-left: 1px solid rgba(0,0,0,.18); }
-.cover-front img, .frame img { width: 100%; height: 100%; object-fit: cover; object-position: center center; transform-origin: center; user-select: none; pointer-events: none; background: transparent; }
+.cover-front img { width: 100%; height: 100%; object-fit: cover; object-position: center center; transform-origin: center; user-select: none; pointer-events: none; background: transparent; }
+.frame img { width: 100%; height: 100%; object-fit: cover; object-position: center center; transform-origin: center; user-select: none; pointer-events: none; background: transparent; }
 .cover-empty, .empty-photo {
   width: 100%; height: 100%; display: grid; place-items: center;
   background: linear-gradient(135deg, #f8f4ed, #ded5c8);
@@ -180,12 +181,13 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 .thumb-nav small { color: #d7d0c5; font-size: 11px; }
 .photo-strip { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 10px 12px 14px; }
 .photo-tile { position: relative; flex: 0 0 auto; width: 78px; height: 58px; border: 2px solid rgba(255,255,255,.28); border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; background: #222; }
-.photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-tile img { width: 100%; height: 100%; object-fit: contain; display: block; background: #111; }
 .photo-tile.selected { border-color: var(--gold-2); box-shadow: 0 0 0 3px rgba(245,202,99,.3); }
-.photo-tile.used { opacity: .82; }
-.photo-index { position: absolute; left: 4px; top: 4px; background: rgba(255,255,255,.9); color: #2c2824; border-radius: 999px; padding: 1px 5px; font-size: 10px; font-weight: 900; }
-.photo-tile b { position: absolute; right: 4px; top: 4px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold-2); color: #251b0b; display: grid; place-items: center; font-size: 11px; }
-.photo-tile small { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,.62); color: #fff; border-radius: 999px; padding: 1px 5px; font-size: 9px; font-weight: 900; }
+.photo-tile.used { opacity: 1; }
+.photo-tile.used::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.5); pointer-events: none; }
+.photo-index { position: absolute; left: 4px; top: 4px; background: rgba(255,255,255,.9); color: #2c2824; border-radius: 999px; padding: 1px 5px; font-size: 10px; font-weight: 900; z-index: 2; }
+.photo-tile b { position: absolute; right: 4px; top: 4px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold-2); color: #251b0b; display: grid; place-items: center; font-size: 11px; z-index: 2; }
+.photo-tile small { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,.72); color: #fff; border-radius: 999px; padding: 1px 5px; font-size: 9px; font-weight: 900; z-index: 2; }
 .filmstrip-empty { color: #d7d0c5; border: 1px dashed rgba(255,255,255,.22); border-radius: 12px; padding: 18px 22px; font-weight: 800; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(20,16,12,.62); display: grid; place-items: center; padding: 24px; }
@@ -723,10 +725,4 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 
 .frame-swap-handle:active {
   cursor: grabbing;
-}
-
-/* Ajuste pontual: miniatura mostra a foto inteira na timeline, sem cortar. */
-.photo-tile img {
-  object-fit: contain !important;
-  background: #222;
 }
