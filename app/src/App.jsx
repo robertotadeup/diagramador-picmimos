@@ -117,17 +117,17 @@ function getLayouts(count, variant = 0) {
   // Grade limpa
   const cols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
   const rows = Math.ceil(safeCount / cols);
-  layouts.push(gridLayout(safeCount, cols, rows, 3, 1.2));
+  layouts.push(gridLayout(safeCount, cols, rows, 0, 0.8, 100, 100, 0));
 
   // Destaque esquerdo
   if (safeCount === 1) {
-    layouts.push([{ x: 12, y: 10, w: 76, h: 80 }]);
+    layouts.push([{ x: 0, y: 0, w: 100, h: 100 }]);
   } else {
     const rest = safeCount - 1;
     const rightCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
     const rightRows = Math.ceil(rest / rightCols);
-    const slots = [{ x: 3, y: 6, w: 53, h: 88 }];
-    const smalls = gridLayout(rest, rightCols, rightRows, 60, 1.2, 37, 88, 6);
+    const slots = [{ x: 0, y: 0, w: 58, h: 100 }];
+    const smalls = gridLayout(rest, rightCols, rightRows, 58.8, 0.8, 41.2, 100, 0);
     layouts.push([...slots, ...smalls]);
   }
 
@@ -136,19 +136,19 @@ function getLayouts(count, variant = 0) {
     const rest = safeCount - 1;
     const leftCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
     const leftRows = Math.ceil(rest / leftCols);
-    const smalls = gridLayout(rest, leftCols, leftRows, 3, 1.2, 37, 88, 6);
-    layouts.push([...smalls, { x: 44, y: 6, w: 53, h: 88 }]);
+    const smalls = gridLayout(rest, leftCols, leftRows, 0, 0.8, 41.2, 100, 0);
+    layouts.push([...smalls, { x: 47, y: 0, w: 53, h: 100 }]);
   }
 
   // Editorial em faixa
   if (safeCount >= 3) {
     const top = Math.min(3, safeCount);
     const bottom = safeCount - top;
-    const slots = gridLayout(top, top, 1, 3, 1.2, 94, 34, 6);
+    const slots = gridLayout(top, top, 1, 0, 0.8, 100, 38, 0);
     if (bottom > 0) {
       const bCols = Math.ceil(Math.sqrt(bottom * 2));
       const bRows = Math.ceil(bottom / bCols);
-      slots.push(...gridLayout(bottom, bCols, bRows, 3, 1.2, 94, 48, 48));
+      slots.push(...gridLayout(bottom, bCols, bRows, 0, 0.8, 100, 61.2, 38.8));
     }
     layouts.push(slots.slice(0, safeCount));
   }
@@ -156,7 +156,7 @@ function getLayouts(count, variant = 0) {
   return layouts[variant % layouts.length] || layouts[0];
 }
 
-function gridLayout(count, cols, rows, startX = 3, gap = 1.2, areaW = 94, areaH = 88, startY = 6) {
+function gridLayout(count, cols, rows, startX = 0, gap = 0.8, areaW = 100, areaH = 100, startY = 0) {
   const cellW = (areaW - gap * (cols - 1)) / cols;
   const cellH = (areaH - gap * (rows - 1)) / rows;
   return Array.from({ length: count }, (_, index) => {
@@ -973,14 +973,14 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5-4", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5-5", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5.4",
+      version: "V5.5",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -1046,7 +1046,7 @@ export default function App() {
           <div className="logo">P</div>
           <div>
             <strong>Diagramador Picmimos V5.4</strong>
-            <span>Meia Capa Fotográfica · alinhamento + resize manual + guias</span>
+            <span>Meia Capa Fotográfica · bleed total + foto inteira + resize/alinhamento</span>
           </div>
         </div>
         <div className="top-actions">
@@ -1103,7 +1103,7 @@ export default function App() {
             {active.type === "spread" && <Button variant="secondary" onClick={autoBuildCurrentSpread}>Montar automático</Button>}
             {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>}
             {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>}
-            <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Margem 0,3 cm</Button>
+            <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Corte 3 mm (visual)</Button>
             <Button variant="secondary" onClick={addText}>Texto</Button>
             <Button variant="danger" onClick={clearActive}>Limpar</Button>
           </div>
@@ -1564,7 +1564,7 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
         <img src={photo.src} alt="" />
       </div>
       <strong>{label}</strong>
-      <p className="hint">Arraste a foto no quadro para reposicionar. Use a rolagem do mouse para aproximar.</p>
+      <p className="hint">Agora a foto entra inteira por padrão. Use zoom apenas se quiser aproximar e os controles Horizontal/Vertical para centralizar exatamente como desejar.</p>
       <label>Zoom</label>
       <input type="range" min="1" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
       <label>Horizontal</label>

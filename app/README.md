@@ -1,3 +1,10 @@
+## Diagramador Picmimos V5.5
+
+Versão ajustada para:
+- usar a lâmina inteira (20x20 = 20,3 x 40, com linha de corte apenas visual);
+- não cropar automaticamente as fotos;
+- manter resize manual, guias e alinhamento.
+
 # Diagramador Picmimos V5.4
 
 Versão de teste focada no miolo:

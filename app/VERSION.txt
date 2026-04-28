@@ -1,1 +1,5 @@
-V5.4 - editor real: resize manual de container, guias magnéticas e alinhamento entre elementos.
+Picmimos Diagramador V5.5
+- Bleed total nas lâminas (linha de 3 mm apenas visual)
+- Foto entra inteira por padrão (sem crop automático)
+- Painel de crop mantido para centralização manual
+- Resize/alinhamento/seleção múltipla mantidos
