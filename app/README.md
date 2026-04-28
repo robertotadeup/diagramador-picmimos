@@ -1,19 +1,11 @@
-## Diagramador Picmimos V5.5
+# Diagramador Picmimos V5.6
 
-Versão ajustada para:
-- usar a lâmina inteira (20x20 = 20,3 x 40, com linha de corte apenas visual);
-- não cropar automaticamente as fotos;
-- manter resize manual, guias e alinhamento.
+Ajustes principais:
 
-# Diagramador Picmimos V5.4
-
-Versão de teste focada no miolo:
-
-- Clicar e arrastar container de foto para mover.
-- Redimensionar container com 8 alças amarelas.
-- Guias magnéticas ao mover e redimensionar.
-- Seleção múltipla com Shift.
-- Alinhamento entre foto/foto, texto/foto e texto/texto.
-- Zoom mínimo da foto bloqueado em 100%.
-
-Envie/substitua a pasta `app` no GitHub/EasyPanel.
+- Fotos preenchem o container, sem fundo bege/letterbox.
+- Arraste a própria foto para ajustar o enquadramento dentro do quadro, estilo SmartAlbums/Auryn.
+- Mover quadro continua separado pelo botão `Mover quadro`; resize continua nas alças amarelas.
+- Guias de centro da página esquerda e direita, além da dobra central.
+- Controle de espaçamento automático entre containers de 0 mm a 5 mm.
+- Mais variações de layout automático para diferentes quantidades de fotos.
+- Dockerfile usa pnpm para evitar erro de npm/vite no EasyPanel.

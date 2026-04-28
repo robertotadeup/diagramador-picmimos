@@ -1,5 +1,8 @@
-Picmimos Diagramador V5.5
-- Bleed total nas lâminas (linha de 3 mm apenas visual)
-- Foto entra inteira por padrão (sem crop automático)
-- Painel de crop mantido para centralização manual
-- Resize/alinhamento/seleção múltipla mantidos
+V5.6 - foto cheia + enquadramento estilo SmartAlbums
+- Foto preenche o container sem fundo bege
+- Arraste a foto no canvas para enquadrar dentro do quadro
+- Mover quadro fica separado no botão/alça Mover
+- Guias de centro da página esquerda, dobra e página direita
+- Controle de espaçamento automático de 0 a 5 mm
+- Mais variações de layout automático
+- Dockerfile com pnpm para EasyPanel
