@@ -1,6 +1,5 @@
-V3.7 - Configuração 3D por produto/plugin
-- Mantém a V3.4/V3.5/V3.6: gabarito de capa, arte inteira para Capa Fotográfica Personalizada e preview 3D estável.
-- Adiciona uma estrutura preview3DConfig para cada modelo de capa.
-- Simula os campos que futuramente serão preenchidos pelo plugin WordPress/WooCommerce.
-- O preview passa a receber: modo de capa, material da frente, material da lombada, material do verso, espessuras, ambiente, câmera, luz, sombra, formato, lâminas e lombada.
-- Esta versão não busca o 3D final realista; prepara a arquitetura para o 3D ser configurável pelo dono do laboratório/encadernadora.
+V3.8 - Preview 3D com movimento simples
+- Mantém a V3.7: gabarito de capa, arte inteira para Capa Fotográfica Personalizada e configuração 3D por produto/plugin.
+- Adiciona movimento seguro no preview 3D estável: arrastar com mouse para inclinar, zoom +/-, reset e botões de vista Capa/Aberto/Lombada/Verso.
+- Ainda não é o 3D final estilo Sunpics/WebGL; é uma prévia controlada para validar a experiência sem quebrar o editor 2D.
+- As regras continuam preparadas para futuramente virem do plugin WordPress/WooCommerce.

@@ -1,12 +1,12 @@
-# Diagramador Picmimos V3.7
+# Diagramador Picmimos V3.8
 
-Configuração 3D por produto/plugin.
+Preview 3D com movimento simples e configuração por produto.
 
-Principais pontos:
+Ajustes principais:
 
-- O editor continua preservando o fluxo 2D aprovado.
-- A Capa Fotográfica Personalizada continua usando arte completa: verso + lombada + frente.
-- O gabarito continua mudando pela quantidade de lâminas, seguindo 1 mm por lâmina.
-- Foi criada a estrutura `preview3DConfig`, que representa os campos que futuramente serão controlados pelo plugin WordPress/WooCommerce.
-- Cada modelo de capa pode ter uma regra 3D própria: arte inteira, acrílico, suede, madeira, tecido, magnética ou meia capa.
-- O preview 3D continua estável e simples; o foco desta versão é arquitetura configurável, não realismo final.
+- Mantém a base da V3.7.
+- Capa Fotográfica Personalizada continua como arte completa: verso + lombada + frente.
+- Gabarito da capa continua seguindo a regra de 1 mm por lâmina.
+- Configuração 3D continua preparada para futuro plugin WordPress/WooCommerce.
+- Preview 3D agora tem controles simples: Capa, Aberto, Lombada, Verso, zoom, reset e arraste com mouse para inclinar.
+- Não é ainda o 3D final WebGL estilo Sunpics.
