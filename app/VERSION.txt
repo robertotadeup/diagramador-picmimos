@@ -1,14 +1,9 @@
-V5.8 - enquadramento correto por camada de imagem + máscara final
-- Separação real entre FRAME/CONTAINER, IMAGE LAYER e MASK/CROP FINAL
-- Arrastar em cima da foto move somente a imagem dentro do container
-- Botão “Mover” move somente o container inteiro
-- Alças amarelas redimensionam somente o container
-- Botão transparente “Trocar foto” troca a imagem entre containers
-- Miniaturas da lateral aparecem sempre inteiras, sem crop
-- Foto dentro do frame usa escala controlada, centralizada e reposicionável, sem object-fit cover cego
-- Quando o frame está selecionado, aparece uma prévia translúcida da imagem inteira por trás da máscara para o cliente entender o enquadramento
-- Painel lateral mantém Zoom, Horizontal, Vertical e Centralizar
-- Layouts automáticos mantêm containers horizontais, verticais e quadrados
-- Espaçamento automático de 0 mm a 5 mm
-- Guias de dobra, centro da página esquerda, centro da página direita, centro horizontal e alinhamento
-- Build validado com Vite
+V5.8 - correção cirúrgica do crop mantendo a V5.7
+- Mantida a interface e o comportamento geral da V5.7
+- Corrigida a miniatura da biblioteca lateral para exibir a foto inteira, sem crop
+- Corrigido o enquadramento dentro do container: a imagem agora é camada posicionável atrás da máscara
+- Removido o corte interno causado por object-fit: cover no próprio <img>
+- O container/frame continua sendo a máscara final do corte
+- Arrastar a foto continua reposicionando o enquadramento
+- Botão Mover continua movendo somente o quadro
+- Botão Trocar foto continua separado
