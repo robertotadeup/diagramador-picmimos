@@ -412,3 +412,85 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 .text-resize-handle.handle-s { left: 50%; bottom: -8px; transform: translateX(-50%); cursor: ns-resize; }
 .text-resize-handle.handle-sw { left: -8px; bottom: -8px; cursor: nesw-resize; }
 .text-resize-handle.handle-w { left: -8px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+
+/* V5.2 - alinhamento, guias e resize manual de quadro */
+.guide-line {
+  position: absolute;
+  pointer-events: none;
+  z-index: 55;
+  background: rgba(86, 148, 255, .95);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.4);
+}
+
+.guide-line.vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-0.5px);
+}
+
+.guide-line.horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-0.5px);
+}
+
+.frame.highlighted,
+.text-box.highlighted {
+  box-shadow: 0 0 0 2px rgba(86,148,255,.92), 0 6px 18px rgba(0,0,0,.14);
+}
+
+.text-box.highlighted {
+  outline: 2px dashed rgba(86,148,255,.92);
+}
+
+.frame.selected {
+  z-index: 40;
+}
+
+.frame-handle {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #1f2d42;
+  background: rgba(255,255,255,.96);
+  color: #1f2d42;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  z-index: 8;
+  padding: 0;
+  box-shadow: 0 6px 16px rgba(0,0,0,.18);
+}
+
+.frame-handle.move {
+  left: 8px;
+  bottom: 8px;
+  cursor: move;
+}
+
+.frame-handle.resize {
+  right: 8px;
+  bottom: 8px;
+  cursor: nwse-resize;
+}
+
+.alignment-box {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fbf8f2;
+}
+
+.alignment-box strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.alignment-box .hint {
+  margin: 0 0 10px;
+  line-height: 1.35;
+}

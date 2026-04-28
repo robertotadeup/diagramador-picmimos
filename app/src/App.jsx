@@ -187,6 +187,95 @@ function createFrames(photoIds, variant = 0) {
   }));
 }
 
+
+function makeFrameRef(id, spreadIndex) {
+  return { kind: "frame", id, spreadIndex };
+}
+
+function makeTextRef(scope, id, spreadIndex = 0) {
+  return { kind: "text", scope, id, spreadIndex };
+}
+
+function sameObjectRef(a, b) {
+  if (!a || !b) return false;
+  return a.kind === b.kind
+    && a.id === b.id
+    && (a.scope || null) === (b.scope || null)
+    && (a.spreadIndex ?? null) === (b.spreadIndex ?? null);
+}
+
+function estimateTextHeight(text) {
+  return clamp(round(((text.size || 26) * 1.5) / 4.2), 5, 24);
+}
+
+function getObjectBounds(ref, cover, spreads) {
+  if (!ref) return null;
+  if (ref.kind === "frame") {
+    const spread = spreads[ref.spreadIndex];
+    const frame = spread?.frames?.find((item) => item.id === ref.id);
+    if (!frame) return null;
+    return { left: frame.x, top: frame.y, width: frame.w, height: frame.h };
+  }
+
+  const texts = ref.scope === "cover" ? cover.texts : spreads[ref.spreadIndex]?.texts;
+  const textItem = texts?.find((item) => item.id === ref.id);
+  if (!textItem) return null;
+  const width = textItem.w || 30;
+  const height = estimateTextHeight(textItem);
+  return {
+    left: round((textItem.x || 50) - width / 2),
+    top: round((textItem.y || 50) - height / 2),
+    width,
+    height,
+  };
+}
+
+function getStageObjects(active, cover, spreads) {
+  if (active.type === "cover") {
+    return (cover.texts || []).map((item) => ({
+      ref: makeTextRef("cover", item.id, 0),
+      bounds: getObjectBounds(makeTextRef("cover", item.id, 0), cover, spreads),
+    })).filter((item) => item.bounds);
+  }
+
+  const spread = spreads[active.index];
+  const frameItems = (spread?.frames || []).map((item) => ({
+    ref: makeFrameRef(item.id, active.index),
+    bounds: getObjectBounds(makeFrameRef(item.id, active.index), cover, spreads),
+  }));
+  const textItems = (spread?.texts || []).map((item) => ({
+    ref: makeTextRef("spread", item.id, active.index),
+    bounds: getObjectBounds(makeTextRef("spread", item.id, active.index), cover, spreads),
+  }));
+
+  return [...frameItems, ...textItems].filter((item) => item.bounds);
+}
+
+function findBestSnap(value, targets, threshold = 1.1) {
+  let best = null;
+  for (const target of targets) {
+    const diff = Math.abs(value - target);
+    if (diff <= threshold && (!best || diff < best.diff)) {
+      best = { target, diff };
+    }
+  }
+  return best;
+}
+
+function GuideLines({ guides }) {
+  if (!guides || (!guides.vertical?.length && !guides.horizontal?.length)) return null;
+  return (
+    <>
+      {(guides.vertical || []).map((value, index) => (
+        <div key={`v-${index}-${value}`} className="guide-line vertical" style={{ left: `${value}%` }} />
+      ))}
+      {(guides.horizontal || []).map((value, index) => (
+        <div key={`h-${index}-${value}`} className="guide-line horizontal" style={{ top: `${value}%` }} />
+      ))}
+    </>
+  );
+}
+
 function Photo({ src, frame }) {
   if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
   return (
@@ -218,6 +307,8 @@ export default function App() {
   const [active, setActive] = useState({ type: "cover", index: 0 });
   const [selectedFrameId, setSelectedFrameId] = useState(null);
   const [selectedTextId, setSelectedTextId] = useState(null);
+  const [selectedObjects, setSelectedObjects] = useState([]);
+  const [guides, setGuides] = useState({ vertical: [], horizontal: [] });
   const [showSafety, setShowSafety] = useState(true);
   const [modal, setModal] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
@@ -242,6 +333,128 @@ export default function App() {
   const coverAspect = coverTotalW / format.closedH;
   const spreadAspect = format.spreadW / format.spreadH;
   const activeAspect = active.type === "cover" ? coverAspect : spreadAspect;
+
+
+  function clearGuides() {
+    setGuides({ vertical: [], horizontal: [] });
+  }
+
+  function isSameStageSelection(current, incoming) {
+    if (!current || !incoming || current.kind !== incoming.kind && (current.kind === "frame" || incoming.kind === "frame")) {
+      if ((current.kind === "frame" || incoming.kind === "frame") && active.type !== "spread") return false;
+    }
+    if (incoming.kind === "frame") return active.type === "spread" && incoming.spreadIndex === active.index;
+    if (incoming.scope === "cover") return active.type === "cover";
+    return active.type === "spread" && incoming.spreadIndex === active.index;
+  }
+
+  function selectObject(ref, event) {
+    if (event?.shiftKey) {
+      setSelectedObjects((prev) => {
+        const scoped = prev.filter((item) => isSameStageSelection(item, ref));
+        const withoutCurrent = scoped.filter((item) => !sameObjectRef(item, ref));
+        if (!withoutCurrent.length) return [ref];
+        return [...withoutCurrent.slice(-1), ref];
+      });
+      return;
+    }
+    setSelectedObjects([ref]);
+  }
+
+  function isObjectSelected(ref) {
+    return selectedObjects.some((item) => sameObjectRef(item, ref));
+  }
+
+  function getSnapTargets(ref) {
+    const stageObjects = getStageObjects(active, cover, spreads).filter((item) => !sameObjectRef(item.ref, ref));
+    const vertical = [];
+    const horizontal = [];
+    stageObjects.forEach((item) => {
+      vertical.push(item.bounds.left, item.bounds.left + item.bounds.width / 2, item.bounds.left + item.bounds.width);
+      horizontal.push(item.bounds.top, item.bounds.top + item.bounds.height / 2, item.bounds.top + item.bounds.height);
+    });
+    if (active.type === "spread") vertical.push(50);
+    return { vertical, horizontal };
+  }
+
+  function snapMoveBounds(bounds, ref) {
+    const targets = getSnapTargets(ref);
+    const vCandidates = [
+      { value: bounds.left, apply: (target) => ({ ...bounds, left: target }) },
+      { value: bounds.left + bounds.width / 2, apply: (target) => ({ ...bounds, left: target - bounds.width / 2 }) },
+      { value: bounds.left + bounds.width, apply: (target) => ({ ...bounds, left: target - bounds.width }) },
+    ];
+    const hCandidates = [
+      { value: bounds.top, apply: (target) => ({ ...bounds, top: target }) },
+      { value: bounds.top + bounds.height / 2, apply: (target) => ({ ...bounds, top: target - bounds.height / 2 }) },
+      { value: bounds.top + bounds.height, apply: (target) => ({ ...bounds, top: target - bounds.height }) },
+    ];
+
+    let next = { ...bounds };
+    const nextGuides = { vertical: [], horizontal: [] };
+
+    let best = null;
+    vCandidates.forEach((candidate) => {
+      const found = findBestSnap(candidate.value, targets.vertical);
+      if (found && (!best || found.diff < best.diff)) best = { ...found, candidate };
+    });
+    if (best) {
+      next = best.candidate.apply(best.target);
+      nextGuides.vertical = [round(best.target)];
+    }
+
+    best = null;
+    hCandidates.forEach((candidate) => {
+      const found = findBestSnap(candidate.value, targets.horizontal);
+      if (found && (!best || found.diff < best.diff)) best = { ...found, candidate };
+    });
+    if (best) {
+      next = best.candidate.apply(best.target);
+      nextGuides.horizontal = [round(best.target)];
+    }
+
+    return { bounds: next, guides: nextGuides };
+  }
+
+  function alignSelected(mode) {
+    if (selectedObjects.length !== 2) return;
+    const movingRef = selectedObjects[0];
+    const referenceRef = selectedObjects[1];
+    const moving = getObjectBounds(movingRef, cover, spreads);
+    const reference = getObjectBounds(referenceRef, cover, spreads);
+    if (!moving || !reference) return;
+
+    let nextLeft = moving.left;
+    if (mode === "left") nextLeft = reference.left;
+    if (mode === "center") nextLeft = reference.left + reference.width / 2 - moving.width / 2;
+    if (mode === "right") nextLeft = reference.left + reference.width - moving.width;
+
+    nextLeft = clamp(nextLeft, 0, 100 - moving.width);
+
+    if (movingRef.kind === "frame") {
+      updateFrame(movingRef.id, { x: round(nextLeft) }, movingRef.spreadIndex);
+      setSelectedFrameId(movingRef.id);
+    } else {
+      const nextX = round(nextLeft + moving.width / 2);
+      updateText(movingRef.id, { x: nextX }, movingRef.scope, movingRef.spreadIndex);
+      setSelectedTextId({ scope: movingRef.scope, id: movingRef.id, spreadIndex: movingRef.spreadIndex });
+    }
+
+    setGuides({ vertical: [round(reference.left), round(reference.left + reference.width / 2), round(reference.left + reference.width)], horizontal: [] });
+    setTimeout(() => clearGuides(), 500);
+  }
+
+  function handleSelectFrame(id, event) {
+    setSelectedFrameId(id);
+    selectObject(makeFrameRef(id, active.index), event);
+    if (!event?.shiftKey) setSelectedTextId(null);
+  }
+
+  function handleSelectText(ref, event) {
+    setSelectedTextId(ref);
+    selectObject({ ...ref, kind: "text" }, event);
+    if (!event?.shiftKey) setSelectedFrameId(null);
+  }
 
   function handlePagesChange(value) {
     const next = Number(value);
@@ -375,9 +588,11 @@ export default function App() {
     if (active.type === "cover") {
       setCover((prev) => ({ ...prev, texts: [...prev.texts, text] }));
       setSelectedTextId({ scope: "cover", id: text.id });
+      setSelectedObjects([{ kind: "text", scope: "cover", id: text.id, spreadIndex: 0 }]);
     } else {
       setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, texts: [...spread.texts, text] } : spread));
       setSelectedTextId({ scope: "spread", spreadIndex: active.index, id: text.id });
+      setSelectedObjects([{ kind: "text", scope: "spread", spreadIndex: active.index, id: text.id }]);
     }
     setSelectedFrameId(null);
   }
@@ -409,6 +624,8 @@ export default function App() {
       } : spread));
     }
     setSelectedTextId(null);
+    setSelectedObjects([]);
+    clearGuides();
   }
 
   function startTextMove(event, text, scope, spreadIndex) {
@@ -421,19 +638,28 @@ export default function App() {
     const startTop = event.clientY;
     const startX = text.x || 50;
     const startY = text.y || 50;
+    const ref = makeTextRef(scope, text.id, spreadIndex);
     const move = (moveEvent) => {
       const dx = ((moveEvent.clientX - startLeft) / rect.width) * 100;
       const dy = ((moveEvent.clientY - startTop) / rect.height) * 100;
       const w = text.w || 30;
-      const x = clamp(startX + dx, w / 2, 100 - w / 2);
-      const y = clamp(startY + dy, 2, 98);
-      updateText(text.id, { x: round(x), y: round(y) }, scope, spreadIndex);
+      const h = estimateTextHeight(text);
+      let left = clamp(startX + dx - w / 2, 0, 100 - w);
+      let top = clamp(startY + dy - h / 2, 0, 100 - h);
+      const snapped = snapMoveBounds({ left, top, width: w, height: h }, ref);
+      left = snapped.bounds.left;
+      top = snapped.bounds.top;
+      setGuides(snapped.guides);
+      updateText(text.id, { x: round(left + w / 2), y: round(top + h / 2) }, scope, spreadIndex);
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      clearGuides();
     };
-    setSelectedTextId(scope === "cover" ? { scope: "cover", id: text.id } : { scope: "spread", spreadIndex, id: text.id });
+    const refInfo = { scope, id: text.id, spreadIndex };
+    setSelectedTextId(refInfo);
+    selectObject({ ...refInfo, kind: "text" }, { shiftKey: event.shiftKey });
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   }
@@ -489,6 +715,7 @@ export default function App() {
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      clearGuides();
     };
 
     setSelectedTextId(scope === "cover" ? { scope: "cover", id: text.id } : { scope: "spread", spreadIndex, id: text.id });
@@ -504,6 +731,8 @@ export default function App() {
       setSelectedFrameId(null);
     }
     setSelectedTextId(null);
+    setSelectedObjects([]);
+    clearGuides();
   }
 
   function updateCoverCrop(patch) {
@@ -516,6 +745,93 @@ export default function App() {
       if (sIndex !== active.index) return spread;
       return { ...spread, frames: spread.frames.map((frame) => frame.id === selectedFrame.id ? { ...frame, ...patch } : frame) };
     }));
+  }
+
+  function updateFrame(frameId, patch, spreadIndex = active.index) {
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== spreadIndex) return spread;
+      return { ...spread, frames: spread.frames.map((frame) => frame.id === frameId ? { ...frame, ...patch } : frame) };
+    }));
+  }
+
+  function startFrameMove(event, frame) {
+    event.preventDefault();
+    event.stopPropagation();
+    const area = event.currentTarget.closest(".spread-layout");
+    if (!area) return;
+    const rect = area.getBoundingClientRect();
+    const startClientX = event.clientX;
+    const startClientY = event.clientY;
+    const startX = frame.x;
+    const startY = frame.y;
+    const ref = makeFrameRef(frame.id, active.index);
+
+    const move = (moveEvent) => {
+      const dx = ((moveEvent.clientX - startClientX) / rect.width) * 100;
+      const dy = ((moveEvent.clientY - startClientY) / rect.height) * 100;
+      let left = clamp(startX + dx, 0, 100 - frame.w);
+      let top = clamp(startY + dy, 0, 100 - frame.h);
+      const snapped = snapMoveBounds({ left, top, width: frame.w, height: frame.h }, ref);
+      left = snapped.bounds.left;
+      top = snapped.bounds.top;
+      setGuides(snapped.guides);
+      updateFrame(frame.id, { x: round(left), y: round(top) });
+    };
+
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      clearGuides();
+    };
+
+    handleSelectFrame(frame.id, { shiftKey: event.shiftKey });
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function startFrameResize(event, frame) {
+    event.preventDefault();
+    event.stopPropagation();
+    const area = event.currentTarget.closest(".spread-layout");
+    if (!area) return;
+    const rect = area.getBoundingClientRect();
+    const startClientX = event.clientX;
+    const startClientY = event.clientY;
+    const startW = frame.w;
+    const startH = frame.h;
+    const snapTargets = getSnapTargets(makeFrameRef(frame.id, active.index));
+
+    const move = (moveEvent) => {
+      const dx = ((moveEvent.clientX - startClientX) / rect.width) * 100;
+      const dy = ((moveEvent.clientY - startClientY) / rect.height) * 100;
+      let nextW = clamp(startW + dx, 8, 100 - frame.x);
+      let nextH = clamp(startH + dy, 8, 100 - frame.y);
+      const rightSnap = findBestSnap(frame.x + nextW, snapTargets.vertical);
+      const bottomSnap = findBestSnap(frame.y + nextH, snapTargets.horizontal);
+      const nextGuides = { vertical: [], horizontal: [] };
+
+      if (rightSnap) {
+        nextW = clamp(rightSnap.target - frame.x, 8, 100 - frame.x);
+        nextGuides.vertical = [round(rightSnap.target)];
+      }
+      if (bottomSnap) {
+        nextH = clamp(bottomSnap.target - frame.y, 8, 100 - frame.y);
+        nextGuides.horizontal = [round(bottomSnap.target)];
+      }
+
+      setGuides(nextGuides);
+      updateFrame(frame.id, { w: round(nextW), h: round(nextH) });
+    };
+
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      clearGuides();
+    };
+
+    handleSelectFrame(frame.id, { shiftKey: event.shiftKey });
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 
   function applyPhotoToFrame(spreadIndex, frameId, photoId) {
@@ -593,14 +909,14 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5-2", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5",
+      version: "V5.2",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -665,8 +981,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5</strong>
-            <span>Meia Capa Fotográfica · upload de capa + texto editável</span>
+            <strong>Diagramador Picmimos V5.2</strong>
+            <span>Meia Capa Fotográfica · alinhamento + resize manual + guias</span>
           </div>
         </div>
         <div className="top-actions">
@@ -709,7 +1025,7 @@ export default function App() {
             <Button variant="secondary" onClick={loadDemo}>Fotos demo</Button>
           </div>
           <Button variant="ghost" onClick={() => { setPhotos([]); setSelectedPhotoIds([]); }}>Limpar biblioteca</Button>
-          <p className="hint">Clique para selecionar. Shift seleciona intervalo. Ctrl/Alt adiciona. Arraste para capa ou lâmina.</p>
+          <p className="hint">Clique para selecionar. Shift seleciona intervalo nas fotos e também permite selecionar 2 elementos na página para alinhar. Arraste para capa ou lâmina.</p>
         </section>
       </aside>
 
@@ -745,7 +1061,9 @@ export default function App() {
                 onPhotoPan={startPhotoPan}
                 onPhotoWheel={zoomPhoto}
                 selectedTextId={selectedTextId}
-                onSelectText={setSelectedTextId}
+                selectedObjects={selectedObjects}
+                guides={guides}
+                onSelectText={handleSelectText}
                 onMoveText={startTextMove}
                 onResizeText={startTextResize}
                 onChangeText={updateText}
@@ -756,13 +1074,17 @@ export default function App() {
                 spreadIndex={active.index}
                 photoMap={photoMap}
                 showSafety={showSafety}
-                onSelectFrame={(id) => { setSelectedFrameId(id); setSelectedTextId(null); }}
+                onSelectFrame={handleSelectFrame}
                 selectedFrameId={selectedFrameId}
+                selectedObjects={selectedObjects}
+                guides={guides}
                 onDropPhoto={applyPhotoToFrame}
                 onPhotoPan={startPhotoPan}
                 onPhotoWheel={zoomPhoto}
+                onMoveFrame={startFrameMove}
+                onResizeFrame={startFrameResize}
                 selectedTextId={selectedTextId}
-                onSelectText={setSelectedTextId}
+                onSelectText={handleSelectText}
                 onMoveText={startTextMove}
                 onResizeText={startTextResize}
                 onChangeText={updateText}
@@ -775,6 +1097,7 @@ export default function App() {
       <aside className="right-panel">
         <section className="panel-card">
           <h3>Ajustes</h3>
+          {selectedObjects.length === 2 && <AlignmentControls objects={selectedObjects} onAlign={alignSelected} />}
           {selectedText ? (
             <TextControls text={selectedText} onChange={updateSelectedText} onRemove={removeSelectedText} />
           ) : active.type === "cover" ? (
@@ -782,7 +1105,7 @@ export default function App() {
           ) : selectedFrame ? (
             <CropControls label="Foto selecionada" photo={currentPhotoForPanel} target={selectedFrame} onChange={updateFrameCrop} />
           ) : (
-            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom/enquadramento, ou arraste outra foto para trocar.</div>
+            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom/enquadramento, ou arraste outra foto para trocar. Ao selecionar 2 elementos com Shift, aparecem os botões de alinhamento.</div>
           )}
         </section>
 
@@ -810,12 +1133,12 @@ export default function App() {
 
       <section className="filmstrip">
         <div className="spread-strip">
-          <button className={`thumb-nav ${active.type === "cover" ? "on" : ""}`} onClick={() => setActive({ type: "cover", index: 0 })}>
+          <button className={`thumb-nav ${active.type === "cover" ? "on" : ""}`} onClick={() => { setActive({ type: "cover", index: 0 }); setSelectedFrameId(null); setSelectedTextId(null); setSelectedObjects([]); clearGuides(); }}>
             <span>Capa</span>
             <small>{cover.photoId ? "ok" : "vazia"}</small>
           </button>
           {spreads.map((spread, index) => (
-            <button key={spread.id} className={`thumb-nav ${active.type === "spread" && active.index === index ? "on" : ""}`} onClick={() => { setActive({ type: "spread", index }); setSelectedFrameId(null); }}>
+            <button key={spread.id} className={`thumb-nav ${active.type === "spread" && active.index === index ? "on" : ""}`} onClick={() => { setActive({ type: "spread", index }); setSelectedFrameId(null); setSelectedTextId(null); setSelectedObjects([]); clearGuides(); }}>
               <span>{spread.name}</span>
               <small>{spread.frames.length ? `${spread.frames.length} foto(s)` : "em branco"}</small>
             </button>
@@ -860,71 +1183,66 @@ function CoverStage({
   onPhotoPan,
   onPhotoWheel,
   selectedTextId,
+  selectedObjects,
+  guides,
   onSelectText,
   onMoveText,
   onResizeText,
   onChangeText,
 }) {
   const photo = cover.photoId ? photoMap.get(cover.photoId) : null;
-  const total = format.closedW * 2 + spineCm;
-  const backPct = (format.closedW / total) * 100;
-  const spinePct = (spineCm / total) * 100;
-  const frontPct = backPct;
+  const selectedPhotoId = selectedPhotoIds[0];
+  const frontWidth = (format.closedW / (format.closedW * 2 + spineCm)) * 100;
+  const spineWidth = (spineCm / (format.closedW * 2 + spineCm)) * 100;
+  const backWidth = 100 - frontWidth - spineWidth;
 
   return (
     <div className="cover-layout">
-      <div className="cover-back" style={{ width: `${backPct}%`, background: texture.css }}>
-        <span>Verso bloqueado</span>
-      </div>
-      <div className="cover-spine" style={{ width: `${spinePct}%`, minWidth: 8, background: texture.css }}>
-        <span>{(spineCm * 10).toFixed(0)}mm</span>
-      </div>
+      <div className="cover-back" style={{ width: `${backWidth}%`, background: texture.css }}>VERSO</div>
+      <div className="cover-spine" style={{ width: `${spineWidth}%`, background: texture.css }}>LOMBADA</div>
       <div
-        className={`cover-front ${!photo ? "needs-photo" : ""}`}
-        style={{ width: `${frontPct}%` }}
+        className={`cover-front ${!cover.photoId ? "needs-photo" : ""}`}
+        style={{ width: `${frontWidth}%` }}
         onDrop={(event) => {
           event.preventDefault();
           const photoId = event.dataTransfer.getData("photo/id");
-          if (photoId) {
-            onUseSelected(photoId);
-          }
+          if (photoId) onUseSelected(photoId);
         }}
         onDragOver={(event) => event.preventDefault()}
+        onPointerDown={(event) => {
+          if (photo) onPhotoPan(event, "cover");
+        }}
         onWheel={(event) => photo && onPhotoWheel(event, "cover")}
-        onPointerDown={(event) => photo && onPhotoPan(event, "cover")}
       >
         {photo ? <Photo src={photo.src} frame={cover} /> : (
-          <div className="cover-upload-zone" onPointerDown={(event) => event.stopPropagation()}>
-            <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto} title="Enviar foto da capa">
-              <span>☁</span>
-              <strong>Enviar foto da capa</strong>
-              <small>Obrigatório para finalizar este modelo</small>
+          <div className="cover-upload-zone">
+            <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto}>
+              <span>＋</span>
+              <strong>Inserir foto da capa</strong>
+              <small>Obrigatório para finalizar</small>
             </button>
-            {selectedPhotoIds?.length ? (
-              <button type="button" className="cover-selected-button" onClick={() => onUseSelected()}>
-                Usar foto selecionada
-              </button>
-            ) : null}
+            {selectedPhotoId && <button type="button" className="cover-selected-button" onClick={() => onUseSelected(selectedPhotoId)}>Usar foto selecionada</button>}
           </div>
         )}
-        {photo && (
-          <button type="button" className="cover-change-button" onClick={onPickCoverPhoto} onPointerDown={(event) => event.stopPropagation()}>
-            Trocar foto
-          </button>
-        )}
+        {photo && <button type="button" className="cover-change-button" onClick={onPickCoverPhoto}>Trocar foto da capa</button>}
+        <GuideLines guides={guides} />
         {showSafety && <div className="safety cover-safe">Margem de segurança 0,3 cm</div>}
-        {cover.texts.map((text) => (
-          <TextBox
-            key={text.id}
-            text={text}
-            scope="cover"
-            selected={selectedTextId?.scope === "cover" && selectedTextId?.id === text.id}
-            onSelect={() => onSelectText({ scope: "cover", id: text.id })}
-            onMove={(event) => onMoveText(event, text, "cover", 0)}
-            onResize={(event, handle) => onResizeText(event, text, "cover", 0, handle)}
-            onChange={(value) => onChangeText(text.id, { value }, "cover", 0)}
-          />
-        ))}
+        {cover.texts.map((text) => {
+          const ref = makeTextRef("cover", text.id, 0);
+          return (
+            <TextBox
+              key={text.id}
+              text={text}
+              scope="cover"
+              selected={selectedTextId?.scope === "cover" && selectedTextId?.id === text.id}
+              highlighted={selectedObjects.some((item) => sameObjectRef(item, { ...ref }))}
+              onSelect={(event) => onSelectText({ scope: "cover", id: text.id, spreadIndex: 0 }, event)}
+              onMove={(event) => onMoveText(event, text, "cover", 0)}
+              onResize={(event, handle) => onResizeText(event, text, "cover", 0, handle)}
+              onChange={(value) => onChangeText(text.id, { value }, "cover", 0)}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -937,9 +1255,13 @@ function SpreadStage({
   showSafety,
   onSelectFrame,
   selectedFrameId,
+  selectedObjects,
+  guides,
   onDropPhoto,
   onPhotoPan,
   onPhotoWheel,
+  onMoveFrame,
+  onResizeFrame,
   selectedTextId,
   onSelectText,
   onMoveText,
@@ -951,16 +1273,20 @@ function SpreadStage({
       <div className="page-label left">Página esquerda</div>
       <div className="page-label right">Página direita</div>
       <div className="center-fold" />
+      <GuideLines guides={guides} />
       {showSafety && <div className="safety spread-safe">Área segura 0,3 cm</div>}
       {spread?.frames?.length ? spread.frames.map((frame, index) => {
         const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
+        const ref = makeFrameRef(frame.id, spreadIndex);
+        const selected = selectedFrameId === frame.id;
+        const highlighted = selectedObjects.some((item) => sameObjectRef(item, ref));
         return (
           <button
             type="button"
             key={frame.id}
-            className={`frame ${selectedFrameId === frame.id ? "selected" : ""}`}
+            className={`frame ${selected ? "selected" : ""} ${highlighted ? "highlighted" : ""}`}
             style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
-            onClick={() => onSelectFrame(frame.id)}
+            onClick={(event) => onSelectFrame(frame.id, event)}
             onDrop={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -969,39 +1295,49 @@ function SpreadStage({
             }}
             onDragOver={(event) => event.preventDefault()}
             onPointerDown={(event) => {
-              onSelectFrame(frame.id);
-              if (photo) onPhotoPan(event, "frame", frame.id, frame);
+              onSelectFrame(frame.id, event);
+              if (!event.shiftKey && photo) onPhotoPan(event, "frame", frame.id, frame);
             }}
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
             title="Arraste outra foto para trocar. Use a rolagem do mouse para aproximar."
           >
             <Photo src={photo?.src} frame={frame} />
             <span>{index + 1}</span>
+            {selected && (
+              <>
+                <button type="button" className="frame-handle move" onPointerDown={(event) => onMoveFrame(event, frame)} title="Mover quadro">✥</button>
+                <button type="button" className="frame-handle resize" onPointerDown={(event) => onResizeFrame(event, frame)} title="Redimensionar quadro">↘</button>
+              </>
+            )}
           </button>
         );
       }) : <div className="blank-spread-message">Lâmina em branco. Selecione fotos e clique em “Montar automático”.</div>}
-      {spread?.texts?.map((text) => (
-        <TextBox
-          key={text.id}
-          text={text}
-          scope="spread"
-          selected={selectedTextId?.scope === "spread" && selectedTextId?.spreadIndex === spreadIndex && selectedTextId?.id === text.id}
-          onSelect={() => onSelectText({ scope: "spread", spreadIndex, id: text.id })}
-          onMove={(event) => onMoveText(event, text, "spread", spreadIndex)}
-          onResize={(event, handle) => onResizeText(event, text, "spread", spreadIndex, handle)}
-          onChange={(value) => onChangeText(text.id, { value }, "spread", spreadIndex)}
-        />
-      ))}
+      {spread?.texts?.map((text) => {
+        const ref = makeTextRef("spread", text.id, spreadIndex);
+        return (
+          <TextBox
+            key={text.id}
+            text={text}
+            scope="spread"
+            selected={selectedTextId?.scope === "spread" && selectedTextId?.spreadIndex === spreadIndex && selectedTextId?.id === text.id}
+            highlighted={selectedObjects.some((item) => sameObjectRef(item, ref))}
+            onSelect={(event) => onSelectText({ scope: "spread", spreadIndex, id: text.id }, event)}
+            onMove={(event) => onMoveText(event, text, "spread", spreadIndex)}
+            onResize={(event, handle) => onResizeText(event, text, "spread", spreadIndex, handle)}
+            onChange={(value) => onChangeText(text.id, { value }, "spread", spreadIndex)}
+          />
+        );
+      })}
     </div>
   );
 }
 
-function TextBox({ text, scope, selected, onSelect, onMove, onResize, onChange }) {
+function TextBox({ text, scope, selected, highlighted, onSelect, onMove, onResize, onChange }) {
   const handles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
   return (
     <div
-      className={`text-box ${selected ? "selected" : ""}`}
+      className={`text-box ${selected ? "selected" : ""} ${highlighted ? "highlighted" : ""}`}
       style={{
         left: `${text.x}%`,
         top: `${text.y}%`,
@@ -1015,11 +1351,11 @@ function TextBox({ text, scope, selected, onSelect, onMove, onResize, onChange }
       }}
       onPointerDown={(event) => {
         event.stopPropagation();
-        onSelect();
+        onSelect(event);
       }}
       onClick={(event) => {
         event.stopPropagation();
-        onSelect();
+        onSelect(event);
       }}
       data-scope={scope}
     >
@@ -1053,6 +1389,24 @@ function TextBox({ text, scope, selected, onSelect, onMove, onResize, onChange }
           aria-label="Redimensionar texto"
         />
       ))}
+    </div>
+  );
+}
+
+function AlignmentControls({ objects, onAlign }) {
+  const moving = objects[0];
+  const reference = objects[1];
+  const describe = (item) => item.kind === "frame" ? "foto/quadro" : "texto";
+
+  return (
+    <div className="alignment-box">
+      <strong>Alinhar elementos</strong>
+      <p className="hint">Último clique = referência. Agora: <b>{describe(moving)}</b> será alinhado em relação a <b>{describe(reference)}</b>.</p>
+      <div className="button-grid">
+        <Button variant="secondary" onClick={() => onAlign("left")}>Esquerda</Button>
+        <Button variant="secondary" onClick={() => onAlign("center")}>Centralizar</Button>
+        <Button variant="secondary" onClick={() => onAlign("right")}>Direita</Button>
+      </div>
     </div>
   );
 }
