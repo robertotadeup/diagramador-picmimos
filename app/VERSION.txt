@@ -1,1 +1,1 @@
-V5.1 - base V5 preservada. Ajuste inicial somente no texto: seleção limpa, mover e redimensionar direto no canvas com alças amarelas estilo SmartAlbums.
+V5.2 - alinhamento entre elementos + resize manual de quadro + guias de alinhamento
