@@ -1,17 +1,17 @@
 FROM node:20-alpine AS builder
-# cache-bust: threejs-preview-3d
 
 WORKDIR /app
 
 RUN corepack enable
 
-COPY package*.json ./
-
-RUN pnpm install --no-frozen-lockfile
-
+# Copia o projeto inteiro antes da instalação para evitar cache antigo de package.json.
 COPY . .
 
-RUN pnpm exec vite build
+# Força instalação real das dependências do 3D, mesmo se o EasyPanel tentar reaproveitar cache.
+RUN rm -rf node_modules pnpm-lock.yaml \
+  && pnpm install --no-frozen-lockfile \
+  && pnpm add three @react-three/fiber @react-three/drei \
+  && pnpm exec vite build
 
 FROM nginx:alpine
 

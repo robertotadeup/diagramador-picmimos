@@ -1,6 +1,6 @@
 {
-  "name": "diagramador-picmimos-v5-7",
-  "version": "5.7.0",
+  "name": "diagramador-picmimos-v5-7-preview-3d-real-test",
+  "version": "5.7.1-3d-test",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,10 @@
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "html-to-image": "latest"
+    "html-to-image": "latest",
+    "three": "latest",
+    "@react-three/fiber": "latest",
+    "@react-three/drei": "latest"
   },
   "devDependencies": {}
 }
