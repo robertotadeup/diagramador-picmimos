@@ -135,8 +135,7 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 .cover-back::after, .cover-spine::after { content: ""; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 1px, transparent 1px 8px); mix-blend-mode: overlay; }
 .cover-spine { border-left: 1px solid rgba(0,0,0,.2); border-right: 1px solid rgba(0,0,0,.2); writing-mode: vertical-rl; text-orientation: mixed; }
 .cover-front { background: #eee; border-left: 1px solid rgba(0,0,0,.18); }
-.cover-front img { width: 100%; height: 100%; object-fit: cover; object-position: center center; transform-origin: center; user-select: none; pointer-events: none; background: transparent; }
-.frame img { width: 100%; height: 100%; object-fit: cover; object-position: center center; transform-origin: center; user-select: none; pointer-events: none; background: transparent; }
+.cover-front img, .frame img { width: 100%; height: 100%; object-fit: cover; object-position: center center; transform-origin: center; user-select: none; pointer-events: none; background: transparent; }
 .cover-empty, .empty-photo {
   width: 100%; height: 100%; display: grid; place-items: center;
   background: linear-gradient(135deg, #f8f4ed, #ded5c8);
@@ -725,4 +724,23 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 
 .frame-swap-handle:active {
   cursor: grabbing;
+}
+
+
+.frame-guide {
+  position: absolute;
+  inset: -16px;
+  border: 1px dashed rgba(255,230,0,.55);
+  background: rgba(255,255,255,.04);
+  pointer-events: none;
+  z-index: 10;
+  opacity: .28;
+}
+
+.frame-guide img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: saturate(.9);
 }

@@ -119,12 +119,6 @@ function gapPct(format, gapMm, axis = "x") {
 function buildFullMosaicLayout(count, gapX = 0.8, gapY = 0.8, variant = 0) {
   const safeCount = clamp(count, 1, 20);
   const patterns = {
-    1: [[1]],
-    2: [[2]],
-    3: [[3]],
-    4: [[2, 2], [4]],
-    5: [[2, 3], [3, 2]],
-    6: [[3, 3], [2, 4], [4, 2]],
     7: [[3, 4], [4, 3], [2, 2, 3]],
     8: [[4, 4], [3, 2, 3], [2, 3, 3]],
     9: [[3, 3, 3], [2, 3, 4], [4, 3, 2]],
@@ -134,16 +128,16 @@ function buildFullMosaicLayout(count, gapX = 0.8, gapY = 0.8, variant = 0) {
     13: [[3, 3, 3, 4], [4, 3, 3, 3], [3, 4, 3, 3]],
     14: [[4, 4, 3, 3], [3, 4, 4, 3], [4, 3, 3, 4]],
     15: [[3, 4, 4, 4], [4, 4, 4, 3], [4, 3, 4, 4]],
-    16: [[4, 4, 4, 4], [3, 3, 3, 3, 4]],
+    16: [[4, 4, 4, 4], [3, 3, 3, 3, 4], [4, 3, 3, 3, 3]],
     17: [[4, 4, 3, 3, 3], [3, 4, 4, 3, 3], [3, 3, 4, 4, 3]],
     18: [[4, 4, 4, 3, 3], [3, 4, 4, 4, 3], [3, 3, 4, 4, 4]],
     19: [[4, 4, 4, 4, 3], [3, 4, 4, 4, 4], [4, 3, 4, 4, 4]],
     20: [[4, 4, 4, 4, 4], [3, 4, 3, 3, 3, 4], [4, 3, 3, 3, 4, 3]],
   };
 
-  const candidates = (patterns[safeCount] || [[safeCount]]).filter((rows) => rows.every((items) => items >= 1 && items <= 4));
+  const candidates = patterns[safeCount] || [[Math.ceil(safeCount / 2), Math.floor(safeCount / 2)]];
   const rowCounts = candidates[((variant % candidates.length) + candidates.length) % candidates.length] || candidates[0];
-  const weightFor = (items) => ({ 1: 1.6, 2: 1.35, 3: 1.05, 4: 0.85 }[items] || 1);
+  const weightFor = (items) => ({ 1: 1.65, 2: 1.35, 3: 1.08, 4: 0.86 }[items] || 0.86);
   const rowWeights = rowCounts.map(weightFor);
   const totalGapY = gapY * Math.max(0, rowCounts.length - 1);
   const usableH = 100 - totalGapY;
@@ -152,11 +146,11 @@ function buildFullMosaicLayout(count, gapX = 0.8, gapY = 0.8, variant = 0) {
   let y = 0;
   return rowCounts.flatMap((itemsInRow, rowIndex) => {
     const rowH = round((usableH * rowWeights[rowIndex]) / totalWeight);
-    const cellW = (100 - gapX * (itemsInRow - 1)) / itemsInRow;
     const rowY = rowIndex === rowCounts.length - 1 ? round(100 - rowH) : round(y);
-    const boxes = Array.from({ length: itemsInRow }, (_, col) => {
-      const x = round(col * (cellW + gapX));
-      const width = col === itemsInRow - 1 ? round(100 - x) : round(cellW);
+    const cellW = (100 - gapX * (itemsInRow - 1)) / itemsInRow;
+    const boxes = Array.from({ length: itemsInRow }, (_, colIndex) => {
+      const x = round(colIndex * (cellW + gapX));
+      const width = colIndex === itemsInRow - 1 ? round(100 - x) : round(cellW);
       const height = rowIndex === rowCounts.length - 1 ? round(100 - rowY) : round(rowH);
       return { x, y: rowY, w: width, h: height };
     });
@@ -263,6 +257,13 @@ function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
     ].slice(0, 6));
   }
 
+  if (safeCount >= 7) {
+    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 0));
+    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 1));
+    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 2));
+    return layouts[((variant % layouts.length) + layouts.length) % layouts.length] || layouts[0];
+  }
+
   if (safeCount === 7) {
     layouts.push([
       box(0, 0, 100, 24),
@@ -291,12 +292,15 @@ function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
   }
 
   if (!layouts.length) {
-    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, variant));
+    const gridCols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
+    const gridRows = Math.ceil(safeCount / gridCols);
+    layouts.push(grid(safeCount, gridCols, gridRows));
     if (safeCount > 1) {
-      layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, variant + 1));
-    }
-    if (safeCount > 2) {
-      layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, variant + 2));
+      const rest = safeCount - 1;
+      layouts.push([
+        box(0, 0, 58, 100),
+        ...grid(rest, rest <= 3 ? 1 : 2, Math.ceil(rest / (rest <= 3 ? 1 : 2)), 58 + gapX, 0, 42 - gapX, 100),
+      ].slice(0, safeCount));
     }
   }
 
@@ -426,12 +430,17 @@ function GuideLines({ guides }) {
 
 function Photo({ src, frame }) {
   if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
+  const posX = clamp(50 + (frame.cropX || 0) * 0.5, 0, 100);
+  const posY = clamp(50 + (frame.cropY || 0) * 0.5, 0, 100);
   return (
     <img
       src={src}
       alt=""
       draggable="false"
-      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
+      style={{
+        objectPosition: `${posX}% ${posY}%`,
+        transform: `scale(${frame.cropScale || 1})`,
+      }}
     />
   );
 }
@@ -1687,6 +1696,11 @@ function SpreadStage({
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
             title="Arraste a foto para enquadrar. Use Mover para mover o quadro e as bolinhas para redimensionar."
           >
+            {selected && photo && (
+              <div className="frame-guide" aria-hidden="true">
+                <img src={photo.src} alt="" draggable="false" />
+              </div>
+            )}
             <div
               className="frame-crop"
               onPointerDown={(event) => {
