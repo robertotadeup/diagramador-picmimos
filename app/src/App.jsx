@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { ContactShadows, Html, OrbitControls } from "@react-three/drei";
 
 const MAX_PAGES = 120;
 const MIN_PAGES = 20;
@@ -116,6 +118,49 @@ function gapPct(format, gapMm, axis = "x") {
   return round((cm / base) * 100);
 }
 
+function buildFullMosaicLayout(count, gapX = 0.8, gapY = 0.8, variant = 0) {
+  const safeCount = clamp(count, 1, 20);
+  const patterns = {
+    7: [[3, 4], [4, 3], [2, 2, 3]],
+    8: [[4, 4], [3, 2, 3], [2, 3, 3]],
+    9: [[3, 3, 3], [2, 3, 4], [4, 3, 2]],
+    10: [[3, 3, 4], [4, 3, 3], [2, 4, 4]],
+    11: [[4, 4, 3], [3, 4, 4], [4, 3, 4]],
+    12: [[4, 4, 4], [3, 3, 3, 3], [2, 3, 3, 4]],
+    13: [[3, 3, 3, 4], [4, 3, 3, 3], [3, 4, 3, 3]],
+    14: [[4, 4, 3, 3], [3, 4, 4, 3], [4, 3, 3, 4]],
+    15: [[3, 4, 4, 4], [4, 4, 4, 3], [4, 3, 4, 4]],
+    16: [[4, 4, 4, 4], [3, 3, 3, 3, 4], [4, 3, 3, 3, 3]],
+    17: [[4, 4, 3, 3, 3], [3, 4, 4, 3, 3], [3, 3, 4, 4, 3]],
+    18: [[4, 4, 4, 3, 3], [3, 4, 4, 4, 3], [3, 3, 4, 4, 4]],
+    19: [[4, 4, 4, 4, 3], [3, 4, 4, 4, 4], [4, 3, 4, 4, 4]],
+    20: [[4, 4, 4, 4, 4], [3, 4, 3, 3, 3, 4], [4, 3, 3, 3, 4, 3]],
+  };
+
+  const candidates = patterns[safeCount] || [[Math.ceil(safeCount / 2), Math.floor(safeCount / 2)]];
+  const rowCounts = candidates[((variant % candidates.length) + candidates.length) % candidates.length] || candidates[0];
+  const weightFor = (items) => ({ 1: 1.65, 2: 1.35, 3: 1.08, 4: 0.86 }[items] || 0.86);
+  const rowWeights = rowCounts.map(weightFor);
+  const totalGapY = gapY * Math.max(0, rowCounts.length - 1);
+  const usableH = 100 - totalGapY;
+  const totalWeight = rowWeights.reduce((sum, value) => sum + value, 0);
+
+  let y = 0;
+  return rowCounts.flatMap((itemsInRow, rowIndex) => {
+    const rowH = round((usableH * rowWeights[rowIndex]) / totalWeight);
+    const rowY = rowIndex === rowCounts.length - 1 ? round(100 - rowH) : round(y);
+    const cellW = (100 - gapX * (itemsInRow - 1)) / itemsInRow;
+    const boxes = Array.from({ length: itemsInRow }, (_, colIndex) => {
+      const x = round(colIndex * (cellW + gapX));
+      const width = colIndex === itemsInRow - 1 ? round(100 - x) : round(cellW);
+      const height = rowIndex === rowCounts.length - 1 ? round(100 - rowY) : round(rowH);
+      return { x, y: rowY, w: width, h: height };
+    });
+    y += rowH + gapY;
+    return boxes;
+  }).slice(0, safeCount);
+}
+
 function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
   const safeCount = clamp(count, 1, 20);
   const gapX = gapPct(format, gapMm, "x");
@@ -212,6 +257,13 @@ function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
       box(0, bottomY, leftBigW, remH),
       ...grid(4, 2, 2, rightX, bottomY, remW, remH),
     ].slice(0, 6));
+  }
+
+  if (safeCount >= 7) {
+    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 0));
+    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 1));
+    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 2));
+    return layouts[((variant % layouts.length) + layouts.length) % layouts.length] || layouts[0];
   }
 
   if (safeCount === 7) {
@@ -380,12 +432,17 @@ function GuideLines({ guides }) {
 
 function Photo({ src, frame }) {
   if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
+  const posX = clamp(50 + (frame.cropX || 0) * 0.5, 0, 100);
+  const posY = clamp(50 + (frame.cropY || 0) * 0.5, 0, 100);
   return (
     <img
       src={src}
       alt=""
       draggable="false"
-      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
+      style={{
+        objectPosition: `${posX}% ${posY}%`,
+        transform: `scale(${frame.cropScale || 1})`,
+      }}
     />
   );
 }
@@ -1219,17 +1276,22 @@ export default function App() {
     };
   }
 
-  function buildPreviewPages() {
+  function buildPreview3DPages() {
     const pages = [];
     pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm });
     spreads.forEach((spread, index) => {
-      pages.push({ id: `preview-spread-${spread.id || index}`, type: "spread", title: spread.name || `Página ${index * 2 + 1}-${index * 2 + 2}`, spread });
+      pages.push({
+        id: `preview-spread-${spread.id || index}`,
+        type: "spread",
+        title: spread.name || `Página ${index * 2 + 1}-${index * 2 + 2}`,
+        spread,
+      });
     });
     return pages;
   }
 
   function makePreview() {
-    setModal({ type: "preview-flip", pages: buildPreviewPages() });
+    setModal({ type: "preview-3d", pages: buildPreview3DPages() });
   }
 
   function finalizeProject() {
@@ -1643,6 +1705,11 @@ function SpreadStage({
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
             title="Arraste a foto para enquadrar. Use Mover para mover o quadro e as bolinhas para redimensionar."
           >
+            {selected && photo && (
+              <div className="frame-guide" aria-hidden="true">
+                <img src={photo.src} alt="" draggable="false" />
+              </div>
+            )}
             <div
               className="frame-crop"
               onPointerDown={(event) => {
@@ -1867,9 +1934,10 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
   );
 }
 
-function PreviewBook({ pages, photoMap }) {
+function Preview3D({ pages, photoMap }) {
   const [index, setIndex] = useState(0);
   const total = pages.length;
+  const page = pages[index] || null;
   const canPrev = index > 0;
   const canNext = index < total - 1;
 
@@ -1892,89 +1960,141 @@ function PreviewBook({ pages, photoMap }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [total]);
 
-  const current = pages[index];
-
   return (
-    <div className="preview-book-shell">
-      <button type="button" className="preview-arrow left" onClick={() => canPrev && setIndex((value) => Math.max(0, value - 1))} disabled={!canPrev} aria-label="Folhear para trás">‹</button>
-      <div className="preview-book-stage">
-        <div className={`preview-book ${current?.type === "cover" ? "is-cover" : "is-spread"}`}>
-          <div className="preview-book-page">
-            {current?.type === "cover" ? (
-              <PreviewCoverPage page={current} photoMap={photoMap} />
-            ) : current?.type === "spread" ? (
-              <PreviewSpreadPage spread={current.spread} photoMap={photoMap} />
-            ) : null}
-          </div>
-        </div>
-        <div className="preview-book-meta">
-          <strong>{current?.title || "Prévia"}</strong>
-          <span>{index + 1} / {Math.max(total, 1)}</span>
-        </div>
-        <div className="preview-book-dots">
-          {pages.map((page, pageIndex) => (
-            <button
-              key={page.id || pageIndex}
-              type="button"
-              className={`preview-dot ${pageIndex === index ? "on" : ""}`}
-              onClick={() => setIndex(pageIndex)}
-              aria-label={`Ir para ${page.title || `página ${pageIndex + 1}`}`}
-            />
-          ))}
+    <div className="preview3d-shell">
+      <div className="preview3d-canvas-wrap">
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 1.35, 5.2], fov: 38 }}>
+          <color attach="background" args={["#e8edf4"]} />
+          <ambientLight intensity={1.2} />
+          <directionalLight position={[3, 5, 4]} intensity={2.2} castShadow shadow-mapSize={[1024, 1024]} />
+          <pointLight position={[-3, 2, 3]} intensity={0.65} />
+          <Preview3DEnvironment />
+          <Album3D page={page} photoMap={photoMap} />
+          <ContactShadows position={[0, -1.05, 0]} opacity={0.38} scale={6} blur={2.4} far={4} />
+          <OrbitControls enablePan={false} minDistance={3.4} maxDistance={7.2} minPolarAngle={0.78} maxPolarAngle={1.82} />
+        </Canvas>
+        <button type="button" className="preview3d-arrow left" onClick={() => canPrev && setIndex((value) => Math.max(0, value - 1))} disabled={!canPrev} aria-label="Folhear para trás">‹</button>
+        <button type="button" className="preview3d-arrow right" onClick={() => canNext && setIndex((value) => Math.min(total - 1, value + 1))} disabled={!canNext} aria-label="Folhear para frente">›</button>
+        <div className="preview3d-floating-actions">
+          <span>{page?.title || "Prévia"}</span>
+          <strong>{index + 1} / {Math.max(total, 1)}</strong>
         </div>
       </div>
-      <button type="button" className="preview-arrow right" onClick={() => canNext && setIndex((value) => Math.min(total - 1, value + 1))} disabled={!canNext} aria-label="Folhear para frente">›</button>
+      <div className="preview3d-dots">
+        {pages.map((item, pageIndex) => (
+          <button
+            type="button"
+            key={item.id || pageIndex}
+            className={`preview3d-dot ${pageIndex === index ? "on" : ""}`}
+            onClick={() => setIndex(pageIndex)}
+            aria-label={`Ir para ${item.title || `prévia ${pageIndex + 1}`}`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-function PreviewCoverPage({ page, photoMap }) {
+function Preview3DEnvironment() {
+  return (
+    <group>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.08, 0]}>
+        <circleGeometry args={[4.6, 96]} />
+        <meshStandardMaterial color="#f4f1e9" roughness={0.42} metalness={0.08} transparent opacity={0.96} />
+      </mesh>
+      <mesh rotation={[0, 0, 0]} position={[0, 1.15, -2.35]}>
+        <planeGeometry args={[8.8, 3.2]} />
+        <meshBasicMaterial color="#d7e2ef" transparent opacity={0.42} />
+      </mesh>
+    </group>
+  );
+}
+
+function Album3D({ page, photoMap }) {
+  const groupRef = useRef(null);
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.7) * 0.025;
+  });
+
+  if (!page) return null;
+
+  return (
+    <group ref={groupRef} position={[0, 0.02, 0]} rotation={[0.08, -0.28, 0]}>
+      {page.type === "cover" ? <ClosedAlbum3D page={page} photoMap={photoMap} /> : <OpenAlbum3D page={page} photoMap={photoMap} />}
+    </group>
+  );
+}
+
+function ClosedAlbum3D({ page, photoMap }) {
+  return (
+    <group rotation={[0.04, 0.25, -0.02]}>
+      <mesh castShadow receiveShadow position={[0, 0, -0.045]}>
+        <boxGeometry args={[2.35, 1.55, 0.12]} />
+        <meshStandardMaterial color="#d8cbb8" roughness={0.74} />
+      </mesh>
+      <mesh castShadow position={[-1.21, 0, 0.035]}>
+        <boxGeometry args={[0.08, 1.56, 0.16]} />
+        <meshStandardMaterial color="#b7a790" roughness={0.82} />
+      </mesh>
+      <Html transform center position={[0.02, 0, 0.035]} distanceFactor={1.48} occlude={false}>
+        <Preview3DCoverDom page={page} photoMap={photoMap} />
+      </Html>
+    </group>
+  );
+}
+
+function OpenAlbum3D({ page, photoMap }) {
+  return (
+    <group rotation={[0.72, 0.06, 0]}>
+      <mesh castShadow receiveShadow position={[0, 0, -0.035]}>
+        <boxGeometry args={[3.45, 1.82, 0.08]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.58} />
+      </mesh>
+      <mesh position={[0, 0, 0.018]}>
+        <boxGeometry args={[0.018, 1.82, 0.09]} />
+        <meshStandardMaterial color="#d8d3cb" roughness={0.9} />
+      </mesh>
+      <Html transform center position={[0, 0, 0.028]} distanceFactor={1.28} occlude={false}>
+        <Preview3DSpreadDom spread={page.spread} photoMap={photoMap} />
+      </Html>
+    </group>
+  );
+}
+
+function Preview3DCoverDom({ page, photoMap }) {
   const photo = page.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
-  const frontWidth = (page.format.closedW / (page.format.closedW * 2 + page.spineCm)) * 100;
-  const spineWidth = (page.spineCm / (page.format.closedW * 2 + page.spineCm)) * 100;
-  const backWidth = 100 - frontWidth - spineWidth;
-  const posX = clamp(50 + ((page.cover?.cropX || 0) * 0.5), 0, 100);
-  const posY = clamp(50 + ((page.cover?.cropY || 0) * 0.5), 0, 100);
+  const posX = clamp(50 + (page.cover?.cropX || 0) * 0.5, 0, 100);
+  const posY = clamp(50 + (page.cover?.cropY || 0) * 0.5, 0, 100);
   const scale = page.cover?.cropScale || 1;
   return (
-    <div className="preview-cover-layout">
-      <div className="preview-cover-back" style={{ width: `${backWidth}%`, background: page.texture?.css }} />
-      <div className="preview-cover-spine" style={{ width: `${spineWidth}%`, background: page.texture?.css }} />
-      <div className="preview-cover-front" style={{ width: `${frontWidth}%` }}>
+    <div className="preview3d-cover-dom">
+      <div className="preview3d-cover-spine-dom" style={{ background: page.texture?.css }} />
+      <div className="preview3d-cover-photo-dom">
         {photo ? (
-          <img
-            src={photo.src}
-            alt=""
-            draggable="false"
-            style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }}
-          />
-        ) : <div className="preview-cover-empty">Sem foto na capa</div>}
+          <img src={photo.src} alt="" draggable="false" style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }} />
+        ) : <span>Sem foto na capa</span>}
       </div>
     </div>
   );
 }
 
-function PreviewSpreadPage({ spread, photoMap }) {
+function Preview3DSpreadDom({ spread, photoMap }) {
   return (
-    <div className="preview-spread-layout">
+    <div className="preview3d-spread-dom">
       {(spread?.frames || []).length ? spread.frames.map((frame) => {
         const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
-        const posX = clamp(50 + ((frame.cropX || 0) * 0.5), 0, 100);
-        const posY = clamp(50 + ((frame.cropY || 0) * 0.5), 0, 100);
+        const posX = clamp(50 + (frame.cropX || 0) * 0.5, 0, 100);
+        const posY = clamp(50 + (frame.cropY || 0) * 0.5, 0, 100);
         const scale = frame.cropScale || 1;
         return (
-          <div key={frame.id} className="preview-frame" style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}>
+          <div key={frame.id} className="preview3d-frame-dom" style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}>
             {photo ? (
-              <img
-                src={photo.src}
-                alt=""
-                draggable="false"
-                style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }}
-              />
-            ) : <div className="preview-empty-photo" />}
+              <img src={photo.src} alt="" draggable="false" style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }} />
+            ) : <div className="preview3d-empty-frame" />}
           </div>
         );
-      }) : <div className="preview-empty-state">Lâmina em branco</div>}
+      }) : <div className="preview3d-empty-spread">Lâmina em branco</div>}
     </div>
   );
 }
@@ -1982,18 +2102,18 @@ function PreviewSpreadPage({ spread, photoMap }) {
 function Modal({ modal, onClose, onExport, photoMap }) {
   return (
     <div className="modal-backdrop">
-      <div className="modal-card">
+      <div className={`modal-card ${modal.type === "preview-3d" ? "preview-3d-card" : ""}`}>
         {modal.type === "saved" && (
           <>
             <h2>Projeto salvo</h2>
             <p>O projeto foi salvo no navegador para teste da V5.</p>
           </>
         )}
-        {modal.type === "preview-flip" && (
+        {modal.type === "preview-3d" && (
           <>
-            <h2>Pré-visualização interativa</h2>
-            <PreviewBook pages={modal.pages || []} photoMap={photoMap} />
-            <p>Use as setas na tela ou as teclas ← e → do teclado para folhear para frente e para trás.</p>
+            <h2>Pré-visualização 3D</h2>
+            <Preview3D pages={modal.pages || []} photoMap={photoMap} />
+            <p>Use as setas na tela ou as teclas ← e → para folhear. Use o mouse para girar, aproximar e afastar o álbum.</p>
           </>
         )}
         {modal.type === "finalize" && (
