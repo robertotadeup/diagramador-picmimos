@@ -1,5 +1,6 @@
-V3.8 - Preview 3D com movimento simples
-- Mantém a V3.7: gabarito de capa, arte inteira para Capa Fotográfica Personalizada e configuração 3D por produto/plugin.
-- Adiciona movimento seguro no preview 3D estável: arrastar com mouse para inclinar, zoom +/-, reset e botões de vista Capa/Aberto/Lombada/Verso.
-- Ainda não é o 3D final estilo Sunpics/WebGL; é uma prévia controlada para validar a experiência sem quebrar o editor 2D.
-- As regras continuam preparadas para futuramente virem do plugin WordPress/WooCommerce.
+V3.9 - Preview 3D Real MVP
+- Substitui a simulação CSS do preview por uma cena real em Three.js/React Three Fiber.
+- Usa peças físicas separadas: capa, lombada, bloco de lâminas, spread, materiais, luz e sombra.
+- Mantém gabarito por lâminas, capa fotográfica personalizada como arte inteira e configuração 3D por produto/plugin.
+- Mantém controles de vista: Capa, Aberto, Lombada, Verso, Zoom e Reset.
+- Base criada para que o futuro plugin WordPress/WooCommerce controle os parâmetros de 3D por laboratório.

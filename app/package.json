@@ -1,6 +1,6 @@
 {
-  "name": "diagramador-picmimos-v3-8-preview3d-movimento",
-  "version": "3.8.0-preview3d-motion",
+  "name": "diagramador-picmimos-v3-9-preview3d-real-mvp",
+  "version": "3.9.0-preview3d-real-mvp",
   "private": true,
   "type": "module",
   "scripts": {
