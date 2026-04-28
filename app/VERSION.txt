@@ -1,8 +1,9 @@
-V5.7 - enquadramento livre + troca de fotos entre containers
-- Layouts automáticos priorizando containers horizontal, vertical e quadrado
-- Não força orientação do container pela orientação da foto
-- Foto continua preenchendo o container e pode ser arrastada para centralizar
-- Botão transparente “Trocar foto” para arrastar de um quadro para outro
-- Mover quadro continua separado no botão “Mover”
-- Mantidas guias, alinhamento, textos e espaçamento do layout automático
-- Build validado com Vite
+V3.2 CONFIG BASE — Picmimos / Proalbuns
+
+- Criado src/config/productConfigs.js como fonte central de configuração.
+- Modelos de capa cadastrados: Fotográfica, Suede, Acrílico, Madeira, Tecido, Magnética e Meia Capa.
+- Formatos corrigidos com medidas abertas Fuji confirmadas.
+- Revestimentos/texturas cadastrados por grupo.
+- Regra de lombada centralizada: 1 mm por lâmina.
+- Painel esquerdo agora lê modelos, formatos, páginas e texturas da configuração.
+- Editor 2D preservado; 3D não foi refinado nesta etapa.

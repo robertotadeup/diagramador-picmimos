@@ -1,6 +1,6 @@
 {
-  "name": "diagramador-picmimos-v5-7-preview-3d-real-v3-rigid-pages",
-  "version": "5.7.3-3d-v3-rigid-pages",
+  "name": "diagramador-picmimos-v3-2-config-base",
+  "version": "3.2.0-config-base",
   "private": true,
   "type": "module",
   "scripts": {
