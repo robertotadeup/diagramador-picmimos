@@ -425,23 +425,35 @@ export default function App() {
     if (!moving || !reference) return;
 
     let nextLeft = moving.left;
+    let nextTop = moving.top;
+
     if (mode === "left") nextLeft = reference.left;
     if (mode === "center") nextLeft = reference.left + reference.width / 2 - moving.width / 2;
     if (mode === "right") nextLeft = reference.left + reference.width - moving.width;
 
+    if (mode === "top") nextTop = reference.top;
+    if (mode === "middle") nextTop = reference.top + reference.height / 2 - moving.height / 2;
+    if (mode === "bottom") nextTop = reference.top + reference.height - moving.height;
+
     nextLeft = clamp(nextLeft, 0, 100 - moving.width);
+    nextTop = clamp(nextTop, 0, 100 - moving.height);
 
     if (movingRef.kind === "frame") {
-      updateFrame(movingRef.id, { x: round(nextLeft) }, movingRef.spreadIndex);
+      updateFrame(movingRef.id, { x: round(nextLeft), y: round(nextTop) }, movingRef.spreadIndex);
       setSelectedFrameId(movingRef.id);
     } else {
-      const nextX = round(nextLeft + moving.width / 2);
-      updateText(movingRef.id, { x: nextX }, movingRef.scope, movingRef.spreadIndex);
+      updateText(movingRef.id, { x: round(nextLeft + moving.width / 2), y: round(nextTop + moving.height / 2) }, movingRef.scope, movingRef.spreadIndex);
       setSelectedTextId({ scope: movingRef.scope, id: movingRef.id, spreadIndex: movingRef.spreadIndex });
     }
 
-    setGuides({ vertical: [round(reference.left), round(reference.left + reference.width / 2), round(reference.left + reference.width)], horizontal: [] });
-    setTimeout(() => clearGuides(), 500);
+    const vGuides = (mode === "left" || mode === "center" || mode === "right")
+      ? [mode === "left" ? reference.left : mode === "center" ? reference.left + reference.width / 2 : reference.left + reference.width]
+      : [];
+    const hGuides = (mode === "top" || mode === "middle" || mode === "bottom")
+      ? [mode === "top" ? reference.top : mode === "middle" ? reference.top + reference.height / 2 : reference.top + reference.height]
+      : [];
+    setGuides({ vertical: vGuides.map(round), horizontal: hGuides.map(round) });
+    setTimeout(() => clearGuides(), 700);
   }
 
   function handleSelectFrame(id, event) {
@@ -755,6 +767,7 @@ export default function App() {
   }
 
   function startFrameMove(event, frame) {
+    if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     const area = event.currentTarget.closest(".spread-layout");
@@ -789,7 +802,8 @@ export default function App() {
     window.addEventListener("pointerup", up);
   }
 
-  function startFrameResize(event, frame) {
+  function startFrameResize(event, frame, handle = "se") {
+    if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     const area = event.currentTarget.closest(".spread-layout");
@@ -797,30 +811,80 @@ export default function App() {
     const rect = area.getBoundingClientRect();
     const startClientX = event.clientX;
     const startClientY = event.clientY;
-    const startW = frame.w;
-    const startH = frame.h;
-    const snapTargets = getSnapTargets(makeFrameRef(frame.id, active.index));
+    const start = { left: frame.x, top: frame.y, width: frame.w, height: frame.h };
+    const ref = makeFrameRef(frame.id, active.index);
 
     const move = (moveEvent) => {
       const dx = ((moveEvent.clientX - startClientX) / rect.width) * 100;
       const dy = ((moveEvent.clientY - startClientY) / rect.height) * 100;
-      let nextW = clamp(startW + dx, 8, 100 - frame.x);
-      let nextH = clamp(startH + dy, 8, 100 - frame.y);
-      const rightSnap = findBestSnap(frame.x + nextW, snapTargets.vertical);
-      const bottomSnap = findBestSnap(frame.y + nextH, snapTargets.horizontal);
+
+      let left = start.left;
+      let top = start.top;
+      let width = start.width;
+      let height = start.height;
+
+      if (handle.includes("e")) width = start.width + dx;
+      if (handle.includes("s")) height = start.height + dy;
+      if (handle.includes("w")) {
+        left = start.left + dx;
+        width = start.width - dx;
+      }
+      if (handle.includes("n")) {
+        top = start.top + dy;
+        height = start.height - dy;
+      }
+
+      const minW = 5;
+      const minH = 5;
+      if (width < minW) {
+        if (handle.includes("w")) left = start.left + start.width - minW;
+        width = minW;
+      }
+      if (height < minH) {
+        if (handle.includes("n")) top = start.top + start.height - minH;
+        height = minH;
+      }
+
+      left = clamp(left, 0, 100 - width);
+      top = clamp(top, 0, 100 - height);
+      width = clamp(width, minW, 100 - left);
+      height = clamp(height, minH, 100 - top);
+
+      const targets = getSnapTargets(ref);
       const nextGuides = { vertical: [], horizontal: [] };
 
-      if (rightSnap) {
-        nextW = clamp(rightSnap.target - frame.x, 8, 100 - frame.x);
+      const leftSnap = handle.includes("w") ? findBestSnap(left, targets.vertical) : null;
+      const rightSnap = handle.includes("e") ? findBestSnap(left + width, targets.vertical) : null;
+      const topSnap = handle.includes("n") ? findBestSnap(top, targets.horizontal) : null;
+      const bottomSnap = handle.includes("s") ? findBestSnap(top + height, targets.horizontal) : null;
+
+      if (leftSnap) {
+        const oldRight = left + width;
+        left = leftSnap.target;
+        width = oldRight - left;
+        nextGuides.vertical = [round(leftSnap.target)];
+      } else if (rightSnap) {
+        width = rightSnap.target - left;
         nextGuides.vertical = [round(rightSnap.target)];
       }
-      if (bottomSnap) {
-        nextH = clamp(bottomSnap.target - frame.y, 8, 100 - frame.y);
+
+      if (topSnap) {
+        const oldBottom = top + height;
+        top = topSnap.target;
+        height = oldBottom - top;
+        nextGuides.horizontal = [round(topSnap.target)];
+      } else if (bottomSnap) {
+        height = bottomSnap.target - top;
         nextGuides.horizontal = [round(bottomSnap.target)];
       }
 
+      left = clamp(left, 0, 100 - width);
+      top = clamp(top, 0, 100 - height);
+      width = clamp(width, minW, 100 - left);
+      height = clamp(height, minH, 100 - top);
+
       setGuides(nextGuides);
-      updateFrame(frame.id, { w: round(nextW), h: round(nextH) });
+      updateFrame(frame.id, { x: round(left), y: round(top), w: round(width), h: round(height) });
     };
 
     const up = () => {
@@ -897,26 +961,26 @@ export default function App() {
     event.preventDefault();
     const delta = event.deltaY < 0 ? 0.08 : -0.08;
     if (target === "cover") {
-      updateCoverCrop({ cropScale: round(clamp((cover.cropScale || 1) + delta, 0.6, 3)) });
+      updateCoverCrop({ cropScale: round(clamp((cover.cropScale || 1) + delta, 1, 3)) });
       return;
     }
     if (!frame) return;
     setSpreads((prev) => prev.map((spread, sIndex) => {
       if (sIndex !== active.index) return spread;
-      return { ...spread, frames: spread.frames.map((item) => item.id === frame.id ? { ...item, cropScale: round(clamp((item.cropScale || 1) + delta, 0.6, 3)) } : item) };
+      return { ...spread, frames: spread.frames.map((item) => item.id === frame.id ? { ...item, cropScale: round(clamp((item.cropScale || 1) + delta, 1, 3)) } : item) };
     }));
   }
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5-3", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5-4", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5.3",
+      version: "V5.4",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -981,7 +1045,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.3</strong>
+            <strong>Diagramador Picmimos V5.4</strong>
             <span>Meia Capa Fotográfica · alinhamento + resize manual + guias</span>
           </div>
         </div>
@@ -1269,6 +1333,8 @@ function SpreadStage({
   onResizeText,
   onChangeText,
 }) {
+  const resizeHandles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+
   return (
     <div className="spread-layout">
       <div className="page-label left">Página esquerda</div>
@@ -1297,18 +1363,31 @@ function SpreadStage({
             }}
             onDragOver={(event) => event.preventDefault()}
             onPointerDown={(event) => {
+              if (event.target.closest(".frame-transform-handle") || event.target.closest(".frame-move-label")) return;
               onSelectFrame(frame.id, event);
-              if (!event.shiftKey && photo) onPhotoPan(event, "frame", frame.id, frame);
+              if (event.shiftKey) return;
+              onMoveFrame(event, frame);
             }}
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
-            title="Arraste outra foto para trocar. Use a rolagem do mouse para aproximar."
+            title="Clique e arraste para mover o quadro. Arraste as bolinhas para redimensionar."
           >
-            <Photo src={photo?.src} frame={frame} />
+            <div className="frame-crop" onDoubleClick={(event) => { event.stopPropagation(); if (photo) onPhotoPan(event, "frame", frame.id, frame); }}>
+              <Photo src={photo?.src} frame={frame} />
+            </div>
             <span>{index + 1}</span>
             {selected && (
               <>
-                <button type="button" className="frame-handle move" onPointerDown={(event) => onMoveFrame(event, frame)} title="Mover quadro">✥</button>
-                <button type="button" className="frame-handle resize" onPointerDown={(event) => onResizeFrame(event, frame)} title="Redimensionar quadro">↘</button>
+                {resizeHandles.map((handle) => (
+                  <button
+                    key={handle}
+                    type="button"
+                    className={`frame-transform-handle handle-${handle}`}
+                    onPointerDown={(event) => onResizeFrame(event, frame, handle)}
+                    title="Redimensionar quadro"
+                    aria-label="Redimensionar quadro"
+                  />
+                ))}
+                <button type="button" className="frame-move-label" onPointerDown={(event) => onMoveFrame(event, frame)} title="Mover quadro">Mover</button>
               </>
             )}
           </div>
@@ -1400,7 +1479,7 @@ function SelectionHelp({ count }) {
     <div className="selection-help">
       <strong>Seleção para alinhar</strong>
       <span>{count}/2 selecionado(s)</span>
-      <p>Para alinhar: clique em um texto/foto, segure Shift e clique em outro. O último clique vira a referência.</p>
+      <p>Para alinhar: clique em um texto/foto, segure Shift e clique em outro. Com 2 selecionados, use os botões abaixo.</p>
     </div>
   );
 }
@@ -1414,10 +1493,13 @@ function AlignmentControls({ objects, onAlign }) {
     <div className="alignment-box">
       <strong>Alinhar elementos</strong>
       <p className="hint">Último clique = referência. Agora: <b>{describe(moving)}</b> será alinhado em relação a <b>{describe(reference)}</b>.</p>
-      <div className="button-grid">
+      <div className="align-grid">
         <Button variant="secondary" onClick={() => onAlign("left")}>Esquerda</Button>
-        <Button variant="secondary" onClick={() => onAlign("center")}>Centralizar</Button>
+        <Button variant="secondary" onClick={() => onAlign("center")}>Centro H</Button>
         <Button variant="secondary" onClick={() => onAlign("right")}>Direita</Button>
+        <Button variant="secondary" onClick={() => onAlign("top")}>Topo</Button>
+        <Button variant="secondary" onClick={() => onAlign("middle")}>Meio V</Button>
+        <Button variant="secondary" onClick={() => onAlign("bottom")}>Base</Button>
       </div>
     </div>
   );
@@ -1484,7 +1566,7 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
       <strong>{label}</strong>
       <p className="hint">Arraste a foto no quadro para reposicionar. Use a rolagem do mouse para aproximar.</p>
       <label>Zoom</label>
-      <input type="range" min="0.6" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
+      <input type="range" min="1" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
       <label>Horizontal</label>
       <input type="range" min="-80" max="80" step="1" value={target.cropX || 0} onChange={(e) => onChange({ cropX: Number(e.target.value) })} />
       <label>Vertical</label>
