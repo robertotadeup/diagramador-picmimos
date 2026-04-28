@@ -725,24 +725,8 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
   cursor: grabbing;
 }
 
-
-/* PATCH CROP REAL — mantém o design da V5.7 e corrige apenas o corte automático. */
+/* Ajuste pontual: miniatura mostra a foto inteira na timeline, sem cortar. */
 .photo-tile img {
   object-fit: contain !important;
   background: #222;
-}
-
-.frame-crop > img.photo-layer,
-.cover-front > img.photo-layer {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  display: block;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
-  object-position: center center !important;
-  transform-origin: center center;
-  pointer-events: none;
-  user-select: none;
 }

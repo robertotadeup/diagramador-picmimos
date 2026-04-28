@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
 
 const MAX_PAGES = 120;
@@ -378,34 +378,14 @@ function GuideLines({ guides }) {
   );
 }
 
-function Photo({ photo, frame, frameAspect = 1 }) {
-  const [loadedImage, setLoadedImage] = useState({ src: null, aspect: null });
-
-  if (!photo?.src) return <div className="empty-photo">Solte uma foto aqui</div>;
-
-  const imageAspect = photo.aspect || (loadedImage.src === photo.src ? loadedImage.aspect : null);
-  const fitByHeight = imageAspect && frameAspect ? imageAspect > frameAspect : false;
-  const imageFitStyle = imageAspect
-    ? (fitByHeight ? { height: "100%", width: "auto" } : { width: "100%", height: "auto" })
-    : { width: "100%", height: "100%", objectFit: "contain" };
-
+function Photo({ src, frame }) {
+  if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
   return (
     <img
-      className="photo-layer"
-      src={photo.src}
+      src={src}
       alt=""
       draggable="false"
-      onLoad={(event) => {
-        const img = event.currentTarget;
-        const aspect = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : null;
-        if (aspect && (loadedImage.src !== photo.src || loadedImage.aspect !== aspect)) {
-          setLoadedImage({ src: photo.src, aspect });
-        }
-      }}
-      style={{
-        ...imageFitStyle,
-        transform: `translate(-50%, -50%) translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})`,
-      }}
+      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
     />
   );
 }
@@ -902,6 +882,63 @@ export default function App() {
     }));
   }
 
+  function normalizePhotoIds(ids) {
+    return Array.from(new Set((ids || []).filter(Boolean))).slice(0, 20);
+  }
+
+  function rebuildSpreadFrames(spread, photoIds, variant = spread.layoutVariant || 0) {
+    const ids = normalizePhotoIds(photoIds);
+    return {
+      ...spread,
+      layoutVariant: variant,
+      frames: ids.length ? createFrames(ids, variant, format, frameGapMm) : [],
+    };
+  }
+
+  function addPhotosToSpread(spreadIndex, incomingPhotoIds) {
+    const idsToAdd = normalizePhotoIds(incomingPhotoIds);
+    if (!idsToAdd.length) return;
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== spreadIndex) return spread;
+      const currentIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
+      return rebuildSpreadFrames(spread, [...currentIds, ...idsToAdd]);
+    }));
+    setActive({ type: "spread", index: spreadIndex });
+    setSelectedFrameId(null);
+    setSelectedTextId(null);
+    setSelectedObjects([]);
+    clearGuides();
+  }
+
+  function removeFrameAndReflow(spreadIndex, frameId) {
+    if (spreadIndex == null || !frameId) return;
+    setSpreads((prev) => prev.map((spread, sIndex) => {
+      if (sIndex !== spreadIndex) return spread;
+      const remainingIds = spread.frames
+        .filter((frame) => frame.id !== frameId)
+        .map((frame) => frame.photoId)
+        .filter(Boolean);
+      return rebuildSpreadFrames(spread, remainingIds);
+    }));
+    setSelectedFrameId(null);
+    setSelectedObjects((prev) => prev.filter((item) => !(item.kind === "frame" && item.id === frameId && item.spreadIndex === spreadIndex)));
+    clearGuides();
+  }
+
+  function getDraggedPhotoIds(event) {
+    const batch = event.dataTransfer.getData("photos/ids");
+    if (batch) {
+      try {
+        const parsed = JSON.parse(batch);
+        return normalizePhotoIds(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        return [];
+      }
+    }
+    const single = event.dataTransfer.getData("photo/id");
+    return single ? [single] : [];
+  }
+
   function startFrameMove(event, frame) {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -1082,23 +1119,23 @@ export default function App() {
     setSelectedTextId(null);
   }
 
-  function handleFramePhotoDrop(spreadIndex, frameId, photoId, sourceFrameId = null) {
+  function handleFramePhotoDrop(spreadIndex, frameId, photoIds, sourceFrameId = null) {
     if (sourceFrameId) {
       swapFramePhotos(spreadIndex, sourceFrameId, frameId);
       return;
     }
-    if (photoId) applyPhotoToFrame(spreadIndex, frameId, photoId);
+    const ids = Array.isArray(photoIds) ? photoIds : [photoIds];
+    addPhotosToSpread(spreadIndex, ids);
   }
 
   function handleDrop(event) {
     event.preventDefault();
-    const photoId = event.dataTransfer.getData("photo/id");
-    if (!photoId) return;
+    const photoIds = getDraggedPhotoIds(event);
+    if (!photoIds.length) return;
     if (active.type === "cover") {
-      applyPhotoToCover(photoId);
+      applyPhotoToCover(photoIds[0]);
     } else {
-      const ids = Array.from(new Set([photoId, ...selectedPhotoIds])).slice(0, 20);
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0, format, frameGapMm) } : spread));
+      addPhotosToSpread(active.index, photoIds);
     }
   }
 
@@ -1219,6 +1256,29 @@ export default function App() {
     : selectedTextId?.scope === "spread" && active.type === "spread" && selectedTextId.spreadIndex === active.index
       ? currentSpread?.texts.find((text) => text.id === selectedTextId.id)
       : null;
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      const target = event.target;
+      const isTyping = target?.closest?.("input, textarea, select, [contenteditable='true']");
+      if (isTyping || modal) return;
+
+      if (active.type === "spread" && selectedFrameId) {
+        event.preventDefault();
+        removeFrameAndReflow(active.index, selectedFrameId);
+        return;
+      }
+
+      if (selectedTextId) {
+        event.preventDefault();
+        removeSelectedText();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [active, selectedFrameId, selectedTextId, modal, spreads, format, frameGapMm]);
 
   return (
     <div className="app-shell">
@@ -1342,7 +1402,6 @@ export default function App() {
                 onMoveText={startTextMove}
                 onResizeText={startTextResize}
                 onChangeText={updateText}
-                format={format}
               />
             )}
           </div>
@@ -1407,7 +1466,12 @@ export default function App() {
               className={`photo-tile ${selectedPhotoIds.includes(photo.id) ? "selected" : ""} ${usedPhotoIds.has(photo.id) ? "used" : ""}`}
               onClick={(event) => togglePhoto(photo.id, event)}
               draggable
-              onDragStart={(event) => event.dataTransfer.setData("photo/id", photo.id)}
+              onDragStart={(event) => {
+                const ids = selectedPhotoIds.includes(photo.id) ? selectedPhotoIds : [photo.id];
+                event.dataTransfer.setData("photo/id", photo.id);
+                event.dataTransfer.setData("photos/ids", JSON.stringify(ids));
+                event.dataTransfer.effectAllowed = "copy";
+              }}
               title={photo.name}
             >
               <img src={photo.src} alt="" />
@@ -1470,7 +1534,7 @@ function CoverStage({
         }}
         onWheel={(event) => photo && onPhotoWheel(event, "cover")}
       >
-        {photo ? <Photo photo={photo} frame={cover} frameAspect={format.closedW / format.closedH} /> : (
+        {photo ? <Photo src={photo.src} frame={cover} /> : (
           <div className="cover-upload-zone">
             <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto}>
               <span>＋</span>
@@ -1524,7 +1588,6 @@ function SpreadStage({
   onMoveText,
   onResizeText,
   onChangeText,
-  format,
 }) {
   const resizeHandles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
@@ -1552,11 +1615,21 @@ function SpreadStage({
             onDrop={(event) => {
               event.preventDefault();
               event.stopPropagation();
+              const batch = event.dataTransfer.getData("photos/ids");
               const photoId = event.dataTransfer.getData("photo/id");
               const sourceFrameId = event.dataTransfer.getData("frame-photo/id");
               if (sourceFrameId) {
                 onSwapFramePhoto(spreadIndex, sourceFrameId, frame.id);
                 return;
+              }
+              if (batch) {
+                try {
+                  const ids = JSON.parse(batch);
+                  if (Array.isArray(ids) && ids.length) onDropPhoto(spreadIndex, frame.id, ids);
+                  return;
+                } catch {
+                  // se houver erro, cai para a foto única abaixo
+                }
               }
               if (photoId) onDropPhoto(spreadIndex, frame.id, photoId);
             }}
@@ -1576,7 +1649,7 @@ function SpreadStage({
                 if (!event.shiftKey && photo) onPhotoPan(event, "frame", frame.id, frame);
               }}
             >
-              <Photo photo={photo} frame={frame} frameAspect={(frame.w * format.spreadW) / Math.max(0.01, frame.h * format.spreadH)} />
+              <Photo src={photo?.src} frame={frame} />
             </div>
             <span>{index + 1}</span>
             {selected && (
