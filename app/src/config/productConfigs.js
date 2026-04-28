@@ -1,4 +1,4 @@
-// V3.4 Gabarito de Capa — Picmimos / Proalbuns
+// V3.7 Configuração 3D por produto — Picmimos / Proalbuns
 // Este arquivo centraliza as configurações comerciais e técnicas do álbum.
 // Futuramente o plugin WordPress/WooCommerce deve alimentar estes mesmos dados.
 
@@ -34,6 +34,123 @@ export const PREVIEW_3D = {
   pageType: "rigid_800g",
   turnType: "rigid_board",
   opening: "layflat_180",
+};
+
+export const PREVIEW_3D_ADMIN_SCHEMA = {
+  source: "wordpress_plugin_admin",
+  description: "Campos que o plugin deverá oferecer para cada produto/modelo de capa.",
+  fields: [
+    "tipo_visual_3d",
+    "modo_de_capa",
+    "material_frente",
+    "material_lombada",
+    "material_verso",
+    "espessura_capa_mm",
+    "espessura_lamina_mm",
+    "tipo_de_virada",
+    "abertura",
+    "ambiente",
+    "camera_inicial",
+    "intensidade_luz",
+    "sombra",
+    "arquivo_gabarito_por_lamina",
+  ],
+};
+
+export const PREVIEW_3D_BASE_CONFIG = {
+  source: "wordpress_plugin_admin",
+  pluginControlled: true,
+  pageType: "rigid_800g",
+  turnType: "rigid_board",
+  opening: "layflat_180",
+  coverThicknessMm: 3,
+  boardThicknessMm: 0.8,
+  environment: "studio_clean",
+  cameraPreset: "front_angled",
+  lightPreset: "softbox_studio",
+  shadowPreset: "soft_contact_shadow",
+  allowMouseOrbit: true,
+  allowPageNavigation: true,
+};
+
+export const PREVIEW_3D_BY_COVER_MODEL = {
+  capa_fotografica_personalizada: {
+    label: "3D: arte inteira",
+    coverMode: "full_cover_art",
+    frontMaterial: "printed_photo_art",
+    spineMaterial: "printed_photo_art",
+    backMaterial: "printed_photo_art",
+    frontEffect: "photo_lamination",
+    requiresTemplate: true,
+    usesTexture: false,
+    description: "O 3D usa uma arte única da capa inteira: verso + lombada + frente. O gabarito muda pela quantidade de lâminas.",
+  },
+  capa_acrilico: {
+    label: "3D: acrílico + textura",
+    coverMode: "front_photo_back_texture",
+    frontMaterial: "acrylic_gloss_front_photo",
+    spineMaterial: "selected_texture",
+    backMaterial: "selected_texture",
+    frontEffect: "acrylic_gloss",
+    requiresTemplate: false,
+    usesTexture: true,
+    description: "Frente com foto e efeito acrílico; lombada e verso usam a textura escolhida.",
+  },
+  capa_suede: {
+    label: "3D: suede + foto frontal",
+    coverMode: "front_photo_back_texture",
+    frontMaterial: "matte_front_photo",
+    spineMaterial: "selected_texture",
+    backMaterial: "selected_texture",
+    frontEffect: "soft_matte",
+    requiresTemplate: false,
+    usesTexture: true,
+    description: "Frente com foto; lombada e verso em textura com aparência de suede.",
+  },
+  capa_madeira: {
+    label: "3D: madeira + foto frontal",
+    coverMode: "front_photo_back_texture",
+    frontMaterial: "matte_front_photo",
+    spineMaterial: "wood_texture",
+    backMaterial: "wood_texture",
+    frontEffect: "natural_matte",
+    requiresTemplate: false,
+    usesTexture: true,
+    description: "Frente com foto; lombada e verso com material madeira/textura cadastrada.",
+  },
+  capa_tecido: {
+    label: "3D: tecido + foto frontal",
+    coverMode: "front_photo_back_texture",
+    frontMaterial: "matte_front_photo",
+    spineMaterial: "fabric_texture",
+    backMaterial: "fabric_texture",
+    frontEffect: "soft_matte",
+    requiresTemplate: false,
+    usesTexture: true,
+    description: "Frente com foto; lombada e verso em tecido/textura cadastrada.",
+  },
+  capa_magnetica: {
+    label: "3D: magnética + foto frontal",
+    coverMode: "front_photo_back_texture",
+    frontMaterial: "matte_front_photo",
+    spineMaterial: "selected_texture",
+    backMaterial: "selected_texture",
+    frontEffect: "premium_matte",
+    requiresTemplate: false,
+    usesTexture: true,
+    description: "Frente com foto; lombada e verso em textura, com regra de capa magnética no plugin.",
+  },
+  capa_meia_capa: {
+    label: "3D: meia capa + textura",
+    coverMode: "front_photo_back_texture",
+    frontMaterial: "matte_front_photo",
+    spineMaterial: "selected_texture",
+    backMaterial: "selected_texture",
+    frontEffect: "matte_photo",
+    requiresTemplate: false,
+    usesTexture: true,
+    description: "Frente com foto obrigatória; lombada e verso usam a textura escolhida.",
+  },
 };
 
 export const COVER_TEMPLATE_SETTINGS = {
@@ -408,4 +525,46 @@ export function findFormat(id) {
 
 export function findTexture(id) {
   return TEXTURES.find((item) => item.id === id) || TEXTURES.find((item) => item.id === DEFAULT_TEXTURE_ID) || TEXTURES[0];
+}
+
+export function getPreview3DConfig({ coverModelId, formatId, pageCount, textureId }) {
+  const model = findCoverModel(coverModelId);
+  const format = findFormat(formatId);
+  const texture = findTexture(textureId);
+  const model3D = PREVIEW_3D_BY_COVER_MODEL[model.id] || PREVIEW_3D_BY_COVER_MODEL[DEFAULT_COVER_MODEL_ID];
+  const laminas = getLaminasFromPages(pageCount);
+  const spineMm = getSpineMm(pageCount);
+  const spineCm = spineMm / 10;
+
+  return {
+    ...PREVIEW_3D_BASE_CONFIG,
+    ...model3D,
+    adminSchema: PREVIEW_3D_ADMIN_SCHEMA,
+    modelId: model.id,
+    modelLabel: model.label,
+    modelShortLabel: model.shortLabel,
+    formatId: format.id,
+    formatLabel: format.label,
+    textureId: texture.id,
+    textureLabel: texture.label,
+    textureColor: texture.previewColor,
+    pageCount: Number(pageCount),
+    laminas,
+    spineMm,
+    spineCm,
+    dimensions: {
+      closedWidthCm: format.closedW,
+      closedHeightCm: format.closedH,
+      spreadWidthCm: format.spreadW,
+      spreadHeightCm: format.spreadH,
+      fullCoverWidthCm: Number((format.closedW * 2 + spineCm).toFixed(2)),
+      fullCoverHeightCm: format.closedH,
+    },
+    productionRules: {
+      spineRule: SPINE_RULE,
+      interior: INTERIOR,
+      safetyMarginCm: SAFETY_MARGIN_CM,
+    },
+    pluginFutureKey: `preview3d/${model.id}/${format.id}/${laminas}-laminas`,
+  };
 }
