@@ -1,11 +1,30 @@
-# Diagramador Picmimos V5
+# Diagramador Picmimos / Proalbuns V6
 
-Alterações desta versão:
-- Upload direto dentro da área da capa.
-- Capa frontal obrigatória antes de finalizar.
-- Troca de imagem por arrastar outra foto sobre o quadro.
-- Zoom e enquadramento manual por painel, arraste e rolagem do mouse.
-- Texto editável na capa e no miolo.
-- Texto com fonte, tamanho, cor, negrito, alinhamento, mover e apagar.
+Esta versão foi criada após os testes da V5.
 
-Para usar: envie/substitua a pasta `app` no repositório.
+## O que mudou na V6
+
+- Texto redimensionável diretamente no canvas com alças.
+- Foto/quadro redimensionável diretamente no canvas com alças.
+- Linha-guia magnética para alinhar bordas e centros.
+- Troca de foto por arraste da biblioteca para qualquer quadro ocupado.
+- Troca de foto entre quadros arrastando pelo botão de troca do próprio quadro.
+- Zoom mínimo bloqueado em 100%, evitando foto menor que o container.
+- Pan/enquadramento da foto continua disponível com arraste no quadro e controles laterais.
+- Botão de centralizar imagem.
+- Validação de capa obrigatória antes de finalizar.
+
+## Como usar no GitHub/EasyPanel
+
+Substitua a pasta `app` do repositório por esta pasta `app`.
+
+Arquivos principais:
+
+- `app/src/App.jsx`
+- `app/src/styles.css`
+- `app/package.json`
+- `app/index.html`
+- `app/Dockerfile`
+- `app/nginx.conf`
+
+Depois aguarde o EasyPanel fazer o deploy e teste em aba anônima.

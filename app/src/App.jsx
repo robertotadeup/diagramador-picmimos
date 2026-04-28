@@ -1,1104 +1,1106 @@
-import React, { useMemo, useRef, useState } from "react";
-import * as htmlToImage from "html-to-image";
-
-const MAX_PAGES = 120;
-const MIN_PAGES = 20;
-const SAFETY_MARGIN_CM = 0.3;
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const FORMATS = [
-  { id: "15x15", label: "15x15", closedW: 15, closedH: 15, spreadW: 30, spreadH: 15.2, orientation: "quadrado" },
-  { id: "15x21-v", label: "15x21 vertical", closedW: 15, closedH: 21, spreadW: 30, spreadH: 20.4, orientation: "vertical" },
-  { id: "15x21-h", label: "15x21 horizontal", closedW: 21, closedH: 15, spreadW: 42, spreadH: 15.2, orientation: "horizontal" },
-  { id: "20x20", label: "20x20", closedW: 20, closedH: 20, spreadW: 40, spreadH: 20.3, orientation: "quadrado" },
-  { id: "20x25-v", label: "20x25 vertical", closedW: 20, closedH: 25, spreadW: 40, spreadH: 25.4, orientation: "vertical" },
-  { id: "20x25-h", label: "20x25 horizontal", closedW: 25, closedH: 20, spreadW: 50, spreadH: 20.3, orientation: "horizontal" },
-  { id: "25x25", label: "25x25", closedW: 25, closedH: 25, spreadW: 50, spreadH: 25.4, orientation: "quadrado" },
-  { id: "30x30", label: "30x30", closedW: 30, closedH: 30, spreadW: 60, spreadH: 30.5, orientation: "quadrado" },
-  { id: "30x40", label: "30x40", closedW: 30, closedH: 40, spreadW: 60, spreadH: 40.0, orientation: "vertical" },
+  { id: '15x15', label: '15x15', spread: '30 x 15,2 cm', pages: '15,2 cm' },
+  { id: '15x21-v', label: '15x21 vertical', spread: '30 x 21 cm', pages: '21 cm' },
+  { id: '15x21-h', label: '15x21 horizontal', spread: '42 x 15,2 cm', pages: '15,2 cm' },
+  { id: '20x20', label: '20x20', spread: '40 x 20,3 cm', pages: '20,3 cm' },
+  { id: '20x25-v', label: '20x25 vertical', spread: '40 x 25,4 cm', pages: '25,4 cm' },
+  { id: '20x25-h', label: '20x25 horizontal', spread: '50 x 20,3 cm', pages: '20,3 cm' },
+  { id: '25x25', label: '25x25', spread: '50 x 25,4 cm', pages: '25,4 cm' },
+  { id: '30x30', label: '30x30', spread: '60 x 30,5 cm', pages: '30,5 cm' },
+  { id: '30x40', label: '30x40', spread: '80 x 30,5 cm', pages: '30,5 cm' }
 ];
 
 const TEXTURES = [
-  { id: "preto", label: "Courino Preto", css: "linear-gradient(135deg, #111 0%, #333 50%, #080808 100%)" },
-  { id: "marrom", label: "Courino Marrom", css: "linear-gradient(135deg, #5a351f 0%, #7d5132 48%, #3b2114 100%)" },
-  { id: "champagne", label: "Dune Champagne", css: "linear-gradient(135deg, #d7c5a0 0%, #efe3c7 52%, #bca878 100%)" },
-  { id: "cinza", label: "Courino Cinza", css: "linear-gradient(135deg, #5f6265 0%, #9a9da0 50%, #404245 100%)" },
-  { id: "branco", label: "Courino Branco", css: "linear-gradient(135deg, #eeeeee 0%, #ffffff 45%, #d7d7d7 100%)" },
+  { id: 'champagne', label: 'Dune Champagne', color: '#d8c79d', pattern: 'repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 2px, transparent 2px 8px), linear-gradient(135deg, rgba(255,255,255,.25), transparent)' },
+  { id: 'preto', label: 'Courino Preto', color: '#191716', pattern: 'repeating-linear-gradient(35deg, rgba(255,255,255,.055) 0 1px, transparent 1px 5px)' },
+  { id: 'marrom', label: 'Courino Marrom', color: '#3a241a', pattern: 'repeating-linear-gradient(35deg, rgba(255,255,255,.06) 0 1px, transparent 1px 5px)' },
+  { id: 'cinza', label: 'Linho Cinza', color: '#7d7b72', pattern: 'repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0 1px, transparent 1px 7px), repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0 1px, transparent 1px 6px)' },
+  { id: 'branco', label: 'Courino Branco', color: '#eeeae0', pattern: 'repeating-linear-gradient(45deg, rgba(0,0,0,.045) 0 1px, transparent 1px 5px)' }
 ];
 
-const TEXT_FONTS = [
-  { value: "Arial, Helvetica, sans-serif", label: "Arial" },
-  { value: "Georgia, serif", label: "Georgia" },
-  { value: "Playfair Display, Georgia, serif", label: "Playfair" },
-  { value: "Montserrat, Arial, sans-serif", label: "Montserrat" },
-  { value: "Great Vibes, cursive", label: "Cursiva" },
-  { value: "Cinzel, Georgia, serif", label: "Cinzel" },
-];
+const PAGE_OPTIONS = Array.from({ length: 51 }, (_, i) => 20 + i * 2);
+const SNAP_TOLERANCE = 8;
+const MIN_FRAME_W = 8;
+const MIN_FRAME_H = 8;
+const MIN_TEXT_W = 12;
+const MIN_TEXT_H = 7;
 
-const TEXT_COLORS = ["#222222", "#ffffff", "#d9a441", "#5b5b5b", "#244236", "#9d2f2f"];
+function uid(prefix = 'id') {
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now().toString(36)}`;
+}
 
-const DEMO_PHOTOS = [
-  "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1521335629791-ce4aec67dd47?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1502635385003-ee1e6a1a742d?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80",
-];
-
-function uid(prefix = "id") {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+function textureStyle(texture) {
+  return { backgroundColor: texture.color, backgroundImage: texture.pattern };
 }
 
 function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
+  return Math.max(min, Math.min(max, value));
 }
 
-function makeDemoPhotos() {
-  return DEMO_PHOTOS.map((src, index) => ({ id: uid("demo"), src, name: `Foto demo ${index + 1}` }));
+function svgPhoto(label, bgA, bgB, extra = '') {
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620">
+    <defs>
+      <linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="${bgA}"/><stop offset="1" stop-color="${bgB}"/></linearGradient>
+      <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity="0.22"/></filter>
+    </defs>
+    <rect width="900" height="620" fill="url(#g)"/>
+    <circle cx="730" cy="150" r="105" fill="rgba(255,255,255,.30)"/>
+    <circle cx="230" cy="420" r="150" fill="rgba(255,255,255,.23)"/>
+    <rect x="95" y="105" width="710" height="410" rx="34" fill="rgba(255,255,255,.38)" filter="url(#shadow)"/>
+    <text x="450" y="295" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="700" fill="#2d2926">${label}</text>
+    <text x="450" y="352" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#2d2926" opacity=".72">${extra}</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function loadImageFiles(files) {
-  const list = Array.from(files || []).filter((file) => file.type?.startsWith("image/"));
-  if (!list.length) return Promise.resolve([]);
-  return Promise.all(list.map((file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve({ id: uid("photo"), src: reader.result, name: file.name });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  })));
-}
+const DEMO_PHOTOS = [
+  { id: 'demo-1', name: 'Capa demo', url: svgPhoto('CAPA', '#fafafa', '#cdbb95', 'foto frontal') },
+  { id: 'demo-2', name: 'Família 01', url: svgPhoto('FAMÍLIA', '#6eb06b', '#f0d890', 'foto 01') },
+  { id: 'demo-3', name: 'Casamento 02', url: svgPhoto('CASAMENTO', '#a9c7ff', '#f7d2d2', 'foto 02') },
+  { id: 'demo-4', name: 'Viagem 03', url: svgPhoto('VIAGEM', '#70b8df', '#f4c47d', 'foto 03') },
+  { id: 'demo-5', name: 'Batizado 04', url: svgPhoto('BATIZADO', '#ded8ff', '#f7f3dd', 'foto 04') },
+  { id: 'demo-6', name: 'Detalhe 05', url: svgPhoto('DETALHE', '#d98f73', '#f5e4b8', 'foto 05') },
+  { id: 'demo-7', name: 'Retrato 06', url: svgPhoto('RETRATO', '#b2d9d0', '#7a98c8', 'foto 06') },
+  { id: 'demo-8', name: 'Festa 07', url: svgPhoto('FESTA', '#8c6fd6', '#ffd37a', 'foto 07') },
+  { id: 'demo-9', name: 'Família 08', url: svgPhoto('MEMÓRIA', '#78b68d', '#f2e0b7', 'foto 08') }
+];
 
-function makeText(overrides = {}) {
+function createCoverPage() {
   return {
-    id: uid("text"),
-    value: "Digite seu texto",
-    x: 50,
-    y: 50,
-    size: 26,
-    color: "#ffffff",
-    fontFamily: TEXT_FONTS[0].value,
-    weight: 800,
-    align: "center",
-    ...overrides,
+    frames: [
+      {
+        id: 'cover-photo',
+        x: 53.8,
+        y: 3.5,
+        w: 42.9,
+        h: 93,
+        photoId: null,
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+        lockedMove: true,
+        lockedResize: true,
+        label: 'Foto obrigatória da capa'
+      }
+    ],
+    texts: []
   };
 }
 
-function createBlankSpread(index) {
+function layoutFrames(layoutName = 'magazine5') {
+  if (layoutName === 'hero2') {
+    return [
+      { x: 4, y: 8, w: 44, h: 78 },
+      { x: 52, y: 8, w: 44, h: 78 }
+    ];
+  }
+  if (layoutName === 'grid4') {
+    return [
+      { x: 4, y: 8, w: 22, h: 37 },
+      { x: 28, y: 8, w: 22, h: 37 },
+      { x: 52, y: 8, w: 22, h: 37 },
+      { x: 76, y: 8, w: 20, h: 37 },
+      { x: 4, y: 49, w: 22, h: 37 },
+      { x: 28, y: 49, w: 22, h: 37 },
+      { x: 52, y: 49, w: 22, h: 37 },
+      { x: 76, y: 49, w: 20, h: 37 }
+    ];
+  }
+  if (layoutName === 'clean3') {
+    return [
+      { x: 4, y: 8, w: 31, h: 78 },
+      { x: 38, y: 8, w: 27, h: 36 },
+      { x: 68, y: 8, w: 28, h: 36 },
+      { x: 38, y: 50, w: 58, h: 36 }
+    ];
+  }
+  return [
+    { x: 4, y: 8, w: 23, h: 37 },
+    { x: 28, y: 8, w: 23, h: 37 },
+    { x: 52, y: 8, w: 20, h: 37 },
+    { x: 74, y: 8, w: 22, h: 37 },
+    { x: 4, y: 49, w: 23, h: 37 }
+  ];
+}
+
+function createSpreadPage(layoutName = 'magazine5') {
   return {
-    id: uid("spread"),
-    name: `Página ${index * 2 + 1}-${index * 2 + 2}`,
-    frames: [],
-    texts: [],
-    layoutVariant: 0,
+    frames: layoutFrames(layoutName).map((rect, index) => ({
+      id: uid('frame'),
+      ...rect,
+      photoId: null,
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+      label: `${index + 1}`
+    })),
+    texts: []
   };
 }
 
-function buildBlankSpreads(pageCount) {
-  const spreadCount = pageCount / 2;
-  return Array.from({ length: spreadCount }, (_, index) => createBlankSpread(index));
+function createInitialPages() {
+  return {
+    cover: createCoverPage(),
+    1: createSpreadPage('magazine5'),
+    2: createSpreadPage('magazine5')
+  };
 }
 
-function getSpineCm(pageCount) {
-  const laminas = pageCount / 2;
-  return laminas * 0.1; // 1 mm por lâmina = 0,1 cm
+function readDragPayload(event) {
+  const raw = event.dataTransfer.getData('application/json') || event.dataTransfer.getData('text/plain');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
-function getLayouts(count, variant = 0) {
-  const safeCount = clamp(count, 1, 20);
-  const layouts = [];
-
-  // Grade limpa
-  const cols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
-  const rows = Math.ceil(safeCount / cols);
-  layouts.push(gridLayout(safeCount, cols, rows, 3, 1.2));
-
-  // Destaque esquerdo
-  if (safeCount === 1) {
-    layouts.push([{ x: 12, y: 10, w: 76, h: 80 }]);
-  } else {
-    const rest = safeCount - 1;
-    const rightCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-    const rightRows = Math.ceil(rest / rightCols);
-    const slots = [{ x: 3, y: 6, w: 53, h: 88 }];
-    const smalls = gridLayout(rest, rightCols, rightRows, 60, 1.2, 37, 88, 6);
-    layouts.push([...slots, ...smalls]);
-  }
-
-  // Destaque direito
-  if (safeCount > 1) {
-    const rest = safeCount - 1;
-    const leftCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-    const leftRows = Math.ceil(rest / leftCols);
-    const smalls = gridLayout(rest, leftCols, leftRows, 3, 1.2, 37, 88, 6);
-    layouts.push([...smalls, { x: 44, y: 6, w: 53, h: 88 }]);
-  }
-
-  // Editorial em faixa
-  if (safeCount >= 3) {
-    const top = Math.min(3, safeCount);
-    const bottom = safeCount - top;
-    const slots = gridLayout(top, top, 1, 3, 1.2, 94, 34, 6);
-    if (bottom > 0) {
-      const bCols = Math.ceil(Math.sqrt(bottom * 2));
-      const bRows = Math.ceil(bottom / bCols);
-      slots.push(...gridLayout(bottom, bCols, bRows, 3, 1.2, 94, 48, 48));
-    }
-    layouts.push(slots.slice(0, safeCount));
-  }
-
-  return layouts[variant % layouts.length] || layouts[0];
+function pxToPercentRect(rect, canvasRect) {
+  return {
+    x: (rect.x / canvasRect.width) * 100,
+    y: (rect.y / canvasRect.height) * 100,
+    w: (rect.w / canvasRect.width) * 100,
+    h: (rect.h / canvasRect.height) * 100
+  };
 }
 
-function gridLayout(count, cols, rows, startX = 3, gap = 1.2, areaW = 94, areaH = 88, startY = 6) {
-  const cellW = (areaW - gap * (cols - 1)) / cols;
-  const cellH = (areaH - gap * (rows - 1)) / rows;
-  return Array.from({ length: count }, (_, index) => {
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    return {
-      x: round(startX + col * (cellW + gap)),
-      y: round(startY + row * (cellH + gap)),
-      w: round(cellW),
-      h: round(cellH),
-    };
+function percentToPxRect(el, canvasRect) {
+  return {
+    x: (el.x / 100) * canvasRect.width,
+    y: (el.y / 100) * canvasRect.height,
+    w: (el.w / 100) * canvasRect.width,
+    h: (el.h / 100) * canvasRect.height
+  };
+}
+
+function getAllElements(page) {
+  return [...(page.frames || []).map((el) => ({ ...el, kind: 'frame' })), ...(page.texts || []).map((el) => ({ ...el, kind: 'text' }))];
+}
+
+function applySnap(rectPx, canvasRect, page, activeId, mode = 'move') {
+  const guidesV = [
+    { pos: 0, label: 'borda esquerda' },
+    { pos: canvasRect.width / 2, label: 'centro vertical' },
+    { pos: canvasRect.width, label: 'borda direita' }
+  ];
+  const guidesH = [
+    { pos: 0, label: 'topo' },
+    { pos: canvasRect.height / 2, label: 'centro horizontal' },
+    { pos: canvasRect.height, label: 'base' }
+  ];
+
+  getAllElements(page).forEach((el) => {
+    if (el.id === activeId) return;
+    const r = percentToPxRect(el, canvasRect);
+    guidesV.push({ pos: r.x, label: 'objeto esquerda' }, { pos: r.x + r.w / 2, label: 'objeto centro' }, { pos: r.x + r.w, label: 'objeto direita' });
+    guidesH.push({ pos: r.y, label: 'objeto topo' }, { pos: r.y + r.h / 2, label: 'objeto centro' }, { pos: r.y + r.h, label: 'objeto base' });
   });
+
+  const subjectV = [
+    { key: 'left', pos: rectPx.x },
+    { key: 'center', pos: rectPx.x + rectPx.w / 2 },
+    { key: 'right', pos: rectPx.x + rectPx.w }
+  ];
+  const subjectH = [
+    { key: 'top', pos: rectPx.y },
+    { key: 'middle', pos: rectPx.y + rectPx.h / 2 },
+    { key: 'bottom', pos: rectPx.y + rectPx.h }
+  ];
+
+  let bestV = null;
+  let bestH = null;
+  subjectV.forEach((s) => {
+    guidesV.forEach((g) => {
+      const delta = g.pos - s.pos;
+      if (Math.abs(delta) <= SNAP_TOLERANCE && (!bestV || Math.abs(delta) < Math.abs(bestV.delta))) {
+        bestV = { delta, subject: s.key, pos: g.pos, label: g.label };
+      }
+    });
+  });
+  subjectH.forEach((s) => {
+    guidesH.forEach((g) => {
+      const delta = g.pos - s.pos;
+      if (Math.abs(delta) <= SNAP_TOLERANCE && (!bestH || Math.abs(delta) < Math.abs(bestH.delta))) {
+        bestH = { delta, subject: s.key, pos: g.pos, label: g.label };
+      }
+    });
+  });
+
+  const snapped = { ...rectPx };
+  const lines = [];
+
+  if (bestV) {
+    lines.push({ type: 'v', pos: bestV.pos, label: bestV.label });
+    if (mode === 'resize-right' || bestV.subject === 'right') snapped.w += bestV.delta;
+    else if (mode === 'resize-left' || bestV.subject === 'left') {
+      snapped.x += bestV.delta;
+      snapped.w -= bestV.delta;
+    } else snapped.x += bestV.delta;
+  }
+
+  if (bestH) {
+    lines.push({ type: 'h', pos: bestH.pos, label: bestH.label });
+    if (mode === 'resize-bottom' || bestH.subject === 'bottom') snapped.h += bestH.delta;
+    else if (mode === 'resize-top' || bestH.subject === 'top') {
+      snapped.y += bestH.delta;
+      snapped.h -= bestH.delta;
+    } else snapped.y += bestH.delta;
+  }
+
+  snapped.x = clamp(snapped.x, 0, canvasRect.width - Math.max(1, snapped.w));
+  snapped.y = clamp(snapped.y, 0, canvasRect.height - Math.max(1, snapped.h));
+  snapped.w = clamp(snapped.w, 20, canvasRect.width - snapped.x);
+  snapped.h = clamp(snapped.h, 20, canvasRect.height - snapped.y);
+
+  return { rect: snapped, lines };
 }
 
-function round(v) {
-  return Math.round(v * 100) / 100;
-}
-
-function createFrames(photoIds, variant = 0) {
-  const slots = getLayouts(photoIds.length, variant);
-  return slots.map((slot, index) => ({
-    id: uid("frame"),
-    photoId: photoIds[index],
-    ...slot,
-    cropScale: 1,
-    cropX: 0,
-    cropY: 0,
-  }));
-}
-
-function Photo({ src, frame }) {
-  if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
-  return (
-    <img
-      src={src}
-      alt=""
-      draggable="false"
-      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
-    />
-  );
-}
-
-function Button({ children, onClick, variant = "primary", disabled = false, title }) {
-  return (
-    <button type="button" className={`btn ${variant}`} onClick={onClick} disabled={disabled} title={title}>
-      {children}
-    </button>
-  );
+function getPageTitle(selectedPage) {
+  if (selectedPage === 'cover') return 'Capa';
+  const n = Number(selectedPage);
+  return `Página ${n * 2 - 1}-${n * 2}`;
 }
 
 export default function App() {
-  const [formatId, setFormatId] = useState("20x20");
-  const [pageCount, setPageCount] = useState(20);
-  const [textureId, setTextureId] = useState("champagne");
-  const [photos, setPhotos] = useState([]);
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
-  const [cover, setCover] = useState({ photoId: null, cropScale: 1, cropX: 0, cropY: 0, texts: [] });
-  const [spreads, setSpreads] = useState(() => buildBlankSpreads(20));
-  const [active, setActive] = useState({ type: "cover", index: 0 });
-  const [selectedFrameId, setSelectedFrameId] = useState(null);
-  const [selectedTextId, setSelectedTextId] = useState(null);
-  const [showSafety, setShowSafety] = useState(true);
-  const [modal, setModal] = useState(null);
-  const [savedAt, setSavedAt] = useState(null);
+  const [format, setFormat] = useState(FORMATS[3]);
+  const [pageCount, setPageCount] = useState(30);
+  const [texture, setTexture] = useState(TEXTURES[0]);
+  const [photos, setPhotos] = useState(DEMO_PHOTOS);
+  const [pages, setPages] = useState(createInitialPages);
+  const [selectedPage, setSelectedPage] = useState('cover');
+  const [selected, setSelected] = useState({ kind: 'frame', id: 'cover-photo' });
+  const [layoutName, setLayoutName] = useState('magazine5');
+  const [dragHoverId, setDragHoverId] = useState(null);
+  const [guides, setGuides] = useState([]);
+  const [exportNotice, setExportNotice] = useState('');
+  const [finishNotice, setFinishNotice] = useState('');
+  const canvasRef = useRef(null);
+  const interactionRef = useRef(null);
   const fileInputRef = useRef(null);
-  const coverFileInputRef = useRef(null);
-  const stageRef = useRef(null);
 
-  const format = useMemo(() => FORMATS.find((item) => item.id === formatId) || FORMATS[3], [formatId]);
-  const texture = useMemo(() => TEXTURES.find((item) => item.id === textureId) || TEXTURES[0], [textureId]);
-  const photoMap = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
-  const currentSpread = active.type === "spread" ? spreads[active.index] : null;
-  const selectedFrame = currentSpread?.frames.find((frame) => frame.id === selectedFrameId) || null;
-  const usedPhotoIds = useMemo(() => {
-    const used = new Set();
-    if (cover.photoId) used.add(cover.photoId);
-    spreads.forEach((spread) => spread.frames.forEach((frame) => frame.photoId && used.add(frame.photoId)));
-    return used;
-  }, [cover.photoId, spreads]);
+  const totalSpreads = pageCount / 2;
+  const spreadNumbers = useMemo(() => Array.from({ length: totalSpreads }, (_, i) => i + 1), [totalSpreads]);
+  const currentPage = pages[selectedPage] || createSpreadPage(layoutName);
+  const selectedElement = useMemo(() => {
+    if (!selected) return null;
+    const list = selected.kind === 'frame' ? currentPage.frames : currentPage.texts;
+    return list?.find((el) => el.id === selected.id) || null;
+  }, [selected, currentPage]);
+  const selectedPhoto = selected?.kind === 'frame' && selectedElement?.photoId ? photos.find((p) => p.id === selectedElement.photoId) : null;
+  const coverOk = Boolean(pages.cover?.frames?.find((f) => f.id === 'cover-photo')?.photoId);
 
-  const spineCm = getSpineCm(pageCount);
-  const coverTotalW = format.closedW * 2 + spineCm;
-  const coverAspect = coverTotalW / format.closedH;
-  const spreadAspect = format.spreadW / format.spreadH;
-  const activeAspect = active.type === "cover" ? coverAspect : spreadAspect;
-
-  function handlePagesChange(value) {
-    const next = Number(value);
-    setPageCount(next);
-    setSpreads((old) => {
-      const needed = next / 2;
-      if (old.length === needed) return old;
-      if (old.length > needed) return old.slice(0, needed).map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` }));
-      const extra = Array.from({ length: needed - old.length }, (_, i) => createBlankSpread(old.length + i));
-      return [...old, ...extra];
+  useEffect(() => {
+    setPages((prev) => {
+      const next = { ...prev };
+      spreadNumbers.forEach((n) => {
+        if (!next[n]) next[n] = createSpreadPage(layoutName);
+      });
+      Object.keys(next).forEach((key) => {
+        if (key !== 'cover' && Number(key) > totalSpreads) delete next[key];
+      });
+      return next;
     });
-    if (active.type === "spread" && active.index >= next / 2) setActive({ type: "spread", index: 0 });
-  }
+  }, [pageCount, totalSpreads, layoutName, spreadNumbers]);
 
-  async function importFiles(files) {
-    const loaded = await loadImageFiles(files);
-    if (!loaded.length) return;
-    setPhotos((prev) => [...prev, ...loaded]);
-    setSelectedPhotoIds(loaded.slice(0, 8).map((p) => p.id));
-  }
+  useEffect(() => {
+    function onPointerMove(event) {
+      const drag = interactionRef.current;
+      if (!drag || !canvasRef.current) return;
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
 
-  async function importCoverFiles(files) {
-    const loaded = await loadImageFiles(files);
-    if (!loaded.length) return;
-    const coverPhoto = loaded[0];
-    setPhotos((prev) => [...prev, ...loaded]);
-    setSelectedPhotoIds([coverPhoto.id]);
-    applyPhotoToCover(coverPhoto.id);
-    if (coverFileInputRef.current) coverFileInputRef.current.value = "";
-  }
-
-  function loadDemo() {
-    const demo = makeDemoPhotos();
-    setPhotos(demo);
-    setSelectedPhotoIds(demo.slice(0, 6).map((p) => p.id));
-  }
-
-  function togglePhoto(photoId, event) {
-    if (event?.shiftKey && selectedPhotoIds.length) {
-      const lastId = selectedPhotoIds[selectedPhotoIds.length - 1];
-      const start = photos.findIndex((p) => p.id === lastId);
-      const end = photos.findIndex((p) => p.id === photoId);
-      if (start >= 0 && end >= 0) {
-        const [a, b] = [Math.min(start, end), Math.max(start, end)];
-        const range = photos.slice(a, b + 1).map((p) => p.id);
-        setSelectedPhotoIds(Array.from(new Set([...selectedPhotoIds, ...range])).slice(0, 20));
+      if (drag.type === 'pan-photo') {
+        const scale = Math.max(1, drag.startEl.scale || 1);
+        const maxPan = Math.max(0, ((scale - 1) / scale) * 50);
+        const offsetX = clamp(drag.startEl.offsetX + (dx / drag.frameRect.width) * 100, -maxPan, maxPan);
+        const offsetY = clamp(drag.startEl.offsetY + (dy / drag.frameRect.height) * 100, -maxPan, maxPan);
+        updateFrame(drag.id, { offsetX, offsetY });
         return;
       }
+
+      let rectPx = { ...drag.startRectPx };
+      let mode = 'move';
+      const minWPercent = drag.kind === 'frame' ? MIN_FRAME_W : MIN_TEXT_W;
+      const minHPercent = drag.kind === 'frame' ? MIN_FRAME_H : MIN_TEXT_H;
+      const minW = (minWPercent / 100) * canvasRect.width;
+      const minH = (minHPercent / 100) * canvasRect.height;
+
+      if (drag.type === 'move') {
+        rectPx.x += dx;
+        rectPx.y += dy;
+      }
+
+      if (drag.type === 'resize') {
+        const h = drag.handle;
+        if (h.includes('e')) {
+          rectPx.w = Math.max(minW, drag.startRectPx.w + dx);
+          mode = 'resize-right';
+        }
+        if (h.includes('s')) {
+          rectPx.h = Math.max(minH, drag.startRectPx.h + dy);
+          mode = mode === 'resize-right' ? 'resize-bottom' : 'resize-bottom';
+        }
+        if (h.includes('w')) {
+          const newW = Math.max(minW, drag.startRectPx.w - dx);
+          rectPx.x = drag.startRectPx.x + drag.startRectPx.w - newW;
+          rectPx.w = newW;
+          mode = 'resize-left';
+        }
+        if (h.includes('n')) {
+          const newH = Math.max(minH, drag.startRectPx.h - dy);
+          rectPx.y = drag.startRectPx.y + drag.startRectPx.h - newH;
+          rectPx.h = newH;
+          mode = 'resize-top';
+        }
+      }
+
+      const snapResult = applySnap(rectPx, canvasRect, drag.pageSnapshot, drag.id, mode);
+      setGuides(snapResult.lines.map((line) => ({
+        ...line,
+        posPercent: line.type === 'v' ? (line.pos / canvasRect.width) * 100 : (line.pos / canvasRect.height) * 100
+      })));
+      const nextRect = pxToPercentRect(snapResult.rect, canvasRect);
+
+      if (drag.kind === 'frame') {
+        updateFrame(drag.id, {
+          x: nextRect.x,
+          y: nextRect.y,
+          w: Math.max(minWPercent, nextRect.w),
+          h: Math.max(minHPercent, nextRect.h)
+        });
+      } else {
+        const resizedSize = drag.type === 'resize' ? clamp(Math.round(nextRect.h * 3.2), 12, 120) : undefined;
+        updateText(drag.id, {
+          x: nextRect.x,
+          y: nextRect.y,
+          w: Math.max(minWPercent, nextRect.w),
+          h: Math.max(minHPercent, nextRect.h),
+          ...(resizedSize ? { size: resizedSize } : {})
+        });
+      }
     }
-    if (event?.metaKey || event?.ctrlKey || event?.altKey) {
-      setSelectedPhotoIds((prev) => prev.includes(photoId) ? prev.filter((id) => id !== photoId) : [...prev, photoId].slice(0, 20));
-      return;
+
+    function onPointerUp() {
+      interactionRef.current = null;
+      setGuides([]);
     }
-    setSelectedPhotoIds((prev) => prev.includes(photoId) && prev.length === 1 ? [] : [photoId]);
-  }
 
-  function applyPhotoToCover(photoId) {
-    if (!photoId) return;
-    setCover((prev) => ({ ...prev, photoId, cropScale: 1, cropX: 0, cropY: 0 }));
-    setActive({ type: "cover", index: 0 });
-    setSelectedFrameId(null);
-  }
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [selectedPage, pages]);
 
-  function applySelectedToCover() {
-    const id = selectedPhotoIds[0];
-    if (!id) return alert("Selecione uma foto no rodapé primeiro.");
-    applyPhotoToCover(id);
-  }
-
-  function autoBuildCurrentSpread() {
-    if (active.type !== "spread") {
-      alert("Clique em uma página do miolo no rodapé para montar a lâmina.");
-      return;
-    }
-    let ids = selectedPhotoIds.slice(0, 20);
-    if (!ids.length) {
-      ids = photos.filter((p) => !usedPhotoIds.has(p.id)).slice(0, 4).map((p) => p.id);
-    }
-    if (!ids.length) return alert("Importe ou selecione fotos primeiro.");
-    setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
-  }
-
-  function changeLayout(direction) {
-    if (active.type !== "spread") return;
-    setSpreads((prev) => prev.map((spread, index) => {
-      if (index !== active.index || !spread.frames.length) return spread;
-      const nextVariant = (spread.layoutVariant || 0) + direction;
-      const photoIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
-      return { ...spread, layoutVariant: nextVariant, frames: createFrames(photoIds, ((nextVariant % 4) + 4) % 4) };
-    }));
-  }
-
-  function insertBlankSpread() {
-    setSpreads((prev) => {
-      const insertAt = active.type === "spread" ? active.index + 1 : 0;
-      const next = [...prev.slice(0, insertAt), createBlankSpread(insertAt), ...prev.slice(insertAt)];
-      return next.map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` }));
+  function ensurePage(pageKey) {
+    setPages((prev) => {
+      if (prev[pageKey]) return prev;
+      return { ...prev, [pageKey]: pageKey === 'cover' ? createCoverPage() : createSpreadPage(layoutName) };
     });
-    setPageCount((p) => Math.min(MAX_PAGES, p + 2));
   }
 
-  function duplicateSpread() {
-    if (active.type !== "spread") return alert("Escolha uma página do miolo para duplicar.");
-    setSpreads((prev) => {
-      const original = prev[active.index];
-      const copy = {
-        ...original,
-        id: uid("spread"),
-        frames: original.frames.map((frame) => ({ ...frame, id: uid("frame") })),
-        texts: original.texts.map((text) => ({ ...text, id: uid("text") })),
+  function updateFrame(id, patch) {
+    setPages((prev) => {
+      const page = prev[selectedPage] || createSpreadPage(layoutName);
+      return {
+        ...prev,
+        [selectedPage]: {
+          ...page,
+          frames: page.frames.map((frame) => (frame.id === id ? { ...frame, ...patch } : frame))
+        }
       };
-      const next = [...prev.slice(0, active.index + 1), copy, ...prev.slice(active.index + 1)];
-      return next.map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` }));
     });
-    setPageCount((p) => Math.min(MAX_PAGES, p + 2));
   }
 
-  function removeSpread() {
-    if (active.type !== "spread") return alert("A capa não pode ser removida.");
-    if (spreads.length <= MIN_PAGES / 2) return alert("O produto precisa manter pelo menos 20 páginas.");
-    setSpreads((prev) => prev.filter((_, index) => index !== active.index).map((spread, index) => ({ ...spread, name: `Página ${index * 2 + 1}-${index * 2 + 2}` })));
-    setPageCount((p) => Math.max(MIN_PAGES, p - 2));
-    setActive({ type: "spread", index: Math.max(0, active.index - 1) });
+  function updateText(id, patch) {
+    setPages((prev) => {
+      const page = prev[selectedPage] || createSpreadPage(layoutName);
+      return {
+        ...prev,
+        [selectedPage]: {
+          ...page,
+          texts: page.texts.map((text) => (text.id === id ? { ...text, ...patch } : text))
+        }
+      };
+    });
+  }
+
+  function replaceFramePhoto(frameId, photoId) {
+    updateFrame(frameId, { photoId, scale: 1, offsetX: 0, offsetY: 0 });
+  }
+
+  function swapFramePhotos(sourcePage, sourceId, targetId) {
+    setPages((prev) => {
+      const sourcePageData = prev[sourcePage];
+      const targetPageData = prev[selectedPage];
+      if (!sourcePageData || !targetPageData) return prev;
+      const sourceFrame = sourcePageData.frames.find((f) => f.id === sourceId);
+      const targetFrame = targetPageData.frames.find((f) => f.id === targetId);
+      if (!sourceFrame || !targetFrame) return prev;
+      const sourcePhoto = sourceFrame.photoId;
+      const targetPhoto = targetFrame.photoId;
+
+      if (sourcePage === selectedPage) {
+        return {
+          ...prev,
+          [selectedPage]: {
+            ...targetPageData,
+            frames: targetPageData.frames.map((frame) => {
+              if (frame.id === sourceId) return { ...frame, photoId: targetPhoto, scale: 1, offsetX: 0, offsetY: 0 };
+              if (frame.id === targetId) return { ...frame, photoId: sourcePhoto, scale: 1, offsetX: 0, offsetY: 0 };
+              return frame;
+            })
+          }
+        };
+      }
+
+      return {
+        ...prev,
+        [sourcePage]: {
+          ...sourcePageData,
+          frames: sourcePageData.frames.map((frame) => frame.id === sourceId ? { ...frame, photoId: targetPhoto, scale: 1, offsetX: 0, offsetY: 0 } : frame)
+        },
+        [selectedPage]: {
+          ...targetPageData,
+          frames: targetPageData.frames.map((frame) => frame.id === targetId ? { ...frame, photoId: sourcePhoto, scale: 1, offsetX: 0, offsetY: 0 } : frame)
+        }
+      };
+    });
+  }
+
+  function handleSelectFiles(event) {
+    const files = Array.from(event.target.files || []);
+    const newPhotos = files.map((file, index) => ({
+      id: `${Date.now()}-${index}-${file.name}`,
+      name: file.name,
+      url: URL.createObjectURL(file)
+    }));
+    if (newPhotos.length) setPhotos((prev) => [...prev, ...newPhotos]);
+    event.target.value = '';
+  }
+
+  function handleLibraryClick(photo) {
+    if (selected?.kind === 'frame' && selectedElement) {
+      replaceFramePhoto(selected.id, photo.id);
+      return;
+    }
+    const firstEmpty = currentPage.frames.find((frame) => !frame.photoId);
+    if (firstEmpty) {
+      replaceFramePhoto(firstEmpty.id, photo.id);
+      setSelected({ kind: 'frame', id: firstEmpty.id });
+    }
+  }
+
+  function handleDropOnFrame(event, frameId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const payload = readDragPayload(event);
+    setDragHoverId(null);
+    if (!payload) return;
+    if (payload.type === 'photo') {
+      replaceFramePhoto(frameId, payload.photoId);
+      setSelected({ kind: 'frame', id: frameId });
+    }
+    if (payload.type === 'frame') {
+      if (payload.frameId === frameId && payload.page === selectedPage) return;
+      swapFramePhotos(payload.page, payload.frameId, frameId);
+      setSelected({ kind: 'frame', id: frameId });
+    }
+  }
+
+  function handlePhotoWheel(event, frame) {
+    event.preventDefault();
+    const step = event.deltaY < 0 ? 0.08 : -0.08;
+    const nextScale = clamp(Number(((frame.scale || 1) + step).toFixed(2)), 1, 3);
+    const maxPan = Math.max(0, ((nextScale - 1) / nextScale) * 50);
+    updateFrame(frame.id, {
+      scale: nextScale,
+      offsetX: clamp(frame.offsetX || 0, -maxPan, maxPan),
+      offsetY: clamp(frame.offsetY || 0, -maxPan, maxPan)
+    });
+  }
+
+  function startMove(event, kind, el) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canvasRef.current) return;
+    if (kind === 'frame' && el.lockedMove) return;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    interactionRef.current = {
+      type: 'move',
+      kind,
+      id: el.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      startRectPx: percentToPxRect(el, canvasRect),
+      pageSnapshot: currentPage
+    };
+    setSelected({ kind, id: el.id });
+  }
+
+  function startResize(event, kind, el, handle) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canvasRef.current) return;
+    if (kind === 'frame' && el.lockedResize) return;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    interactionRef.current = {
+      type: 'resize',
+      kind,
+      handle,
+      id: el.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      startRectPx: percentToPxRect(el, canvasRect),
+      pageSnapshot: currentPage
+    };
+    setSelected({ kind, id: el.id });
+  }
+
+  function startPanPhoto(event, frame) {
+    if (!frame.photoId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    interactionRef.current = {
+      type: 'pan-photo',
+      id: frame.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      startEl: frame,
+      frameRect: targetRect
+    };
+    setSelected({ kind: 'frame', id: frame.id });
   }
 
   function addText() {
-    const text = active.type === "cover"
-      ? makeText({ color: "#ffffff", size: 28 })
-      : makeText({ color: "#222222", size: 24 });
-
-    if (active.type === "cover") {
-      setCover((prev) => ({ ...prev, texts: [...prev.texts, text] }));
-      setSelectedTextId({ scope: "cover", id: text.id });
-    } else {
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, texts: [...spread.texts, text] } : spread));
-      setSelectedTextId({ scope: "spread", spreadIndex: active.index, id: text.id });
-    }
-    setSelectedFrameId(null);
-  }
-
-  function updateText(textId, patch, scope = active.type, spreadIndex = active.index) {
-    if (scope === "cover") {
-      setCover((prev) => ({ ...prev, texts: prev.texts.map((text) => text.id === textId ? { ...text, ...patch } : text) }));
-      return;
-    }
-    setSpreads((prev) => prev.map((spread, index) => index === spreadIndex ? {
-      ...spread,
-      texts: spread.texts.map((text) => text.id === textId ? { ...text, ...patch } : text),
-    } : spread));
-  }
-
-  function updateSelectedText(patch) {
-    if (!selectedTextId) return;
-    updateText(selectedTextId.id, patch, selectedTextId.scope, selectedTextId.spreadIndex);
-  }
-
-  function removeSelectedText() {
-    if (!selectedTextId) return;
-    if (selectedTextId.scope === "cover") {
-      setCover((prev) => ({ ...prev, texts: prev.texts.filter((text) => text.id !== selectedTextId.id) }));
-    } else {
-      setSpreads((prev) => prev.map((spread, index) => index === selectedTextId.spreadIndex ? {
-        ...spread,
-        texts: spread.texts.filter((text) => text.id !== selectedTextId.id),
-      } : spread));
-    }
-    setSelectedTextId(null);
-  }
-
-  function startTextMove(event, text, scope, spreadIndex) {
-    event.preventDefault();
-    event.stopPropagation();
-    const area = event.currentTarget.closest(scope === "cover" ? ".cover-front" : ".spread-layout");
-    if (!area) return;
-    const rect = area.getBoundingClientRect();
-    const move = (moveEvent) => {
-      const x = clamp(((moveEvent.clientX - rect.left) / rect.width) * 100, 2, 98);
-      const y = clamp(((moveEvent.clientY - rect.top) / rect.height) * 100, 2, 98);
-      updateText(text.id, { x: round(x), y: round(y) }, scope, spreadIndex);
+    const text = {
+      id: uid('text'),
+      text: selectedPage === 'cover' ? 'Marta\nCanelas' : 'Digite seu texto',
+      x: selectedPage === 'cover' ? 63 : 35,
+      y: selectedPage === 'cover' ? 34 : 36,
+      w: selectedPage === 'cover' ? 25 : 28,
+      h: selectedPage === 'cover' ? 25 : 14,
+      font: 'Montserrat',
+      size: selectedPage === 'cover' ? 54 : 32,
+      color: '#ffffff',
+      bold: false,
+      align: 'center'
     };
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    setSelectedTextId(scope === "cover" ? { scope: "cover", id: text.id } : { scope: "spread", spreadIndex, id: text.id });
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    setPages((prev) => {
+      const page = prev[selectedPage] || createSpreadPage(layoutName);
+      return { ...prev, [selectedPage]: { ...page, texts: [...page.texts, text] } };
+    });
+    setSelected({ kind: 'text', id: text.id });
   }
 
-  function clearActive() {
-    if (active.type === "cover") {
-      setCover((prev) => ({ ...prev, photoId: null, cropScale: 1, cropX: 0, cropY: 0, texts: [] }));
-    } else {
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: [], texts: [] } : spread));
-      setSelectedFrameId(null);
-    }
-    setSelectedTextId(null);
-  }
-
-  function updateCoverCrop(patch) {
-    setCover((prev) => ({ ...prev, ...patch }));
-  }
-
-  function updateFrameCrop(patch) {
-    if (!selectedFrame) return;
-    setSpreads((prev) => prev.map((spread, sIndex) => {
-      if (sIndex !== active.index) return spread;
-      return { ...spread, frames: spread.frames.map((frame) => frame.id === selectedFrame.id ? { ...frame, ...patch } : frame) };
-    }));
-  }
-
-  function applyPhotoToFrame(spreadIndex, frameId, photoId) {
-    setSpreads((prev) => prev.map((spread, sIndex) => {
-      if (sIndex !== spreadIndex) return spread;
-      return {
-        ...spread,
-        frames: spread.frames.map((frame) => frame.id === frameId ? { ...frame, photoId, cropScale: 1, cropX: 0, cropY: 0 } : frame),
-      };
-    }));
-    setSelectedFrameId(frameId);
-    setSelectedTextId(null);
-  }
-
-  function handleDrop(event) {
-    event.preventDefault();
-    const photoId = event.dataTransfer.getData("photo/id");
-    if (!photoId) return;
-    if (active.type === "cover") {
-      applyPhotoToCover(photoId);
-    } else {
-      const ids = Array.from(new Set([photoId, ...selectedPhotoIds])).slice(0, 20);
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
-    }
-  }
-
-  function startPhotoPan(event, target, frameId = null, frameSnapshot = null) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const initial = target === "cover"
-      ? { cropX: cover.cropX || 0, cropY: cover.cropY || 0 }
-      : { cropX: frameSnapshot?.cropX || 0, cropY: frameSnapshot?.cropY || 0 };
-
-    const move = (moveEvent) => {
-      const dx = ((moveEvent.clientX - startX) / rect.width) * 100;
-      const dy = ((moveEvent.clientY - startY) / rect.height) * 100;
-      const patch = {
-        cropX: round(clamp(initial.cropX + dx, -80, 80)),
-        cropY: round(clamp(initial.cropY + dy, -80, 80)),
-      };
-      if (target === "cover") {
-        updateCoverCrop(patch);
-      } else {
-        setSpreads((prev) => prev.map((spread, sIndex) => {
-          if (sIndex !== active.index) return spread;
-          return { ...spread, frames: spread.frames.map((frame) => frame.id === frameId ? { ...frame, ...patch } : frame) };
-        }));
+  function deleteSelected() {
+    if (!selected) return;
+    setPages((prev) => {
+      const page = prev[selectedPage];
+      if (!page) return prev;
+      if (selected.kind === 'frame') {
+        return {
+          ...prev,
+          [selectedPage]: {
+            ...page,
+            frames: page.frames.map((f) => f.id === selected.id ? { ...f, photoId: null, scale: 1, offsetX: 0, offsetY: 0 } : f)
+          }
+        };
       }
-    };
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+      return { ...prev, [selectedPage]: { ...page, texts: page.texts.filter((t) => t.id !== selected.id) } };
+    });
+    setSelected(null);
   }
 
-  function zoomPhoto(event, target, frame = null) {
-    event.preventDefault();
-    const delta = event.deltaY < 0 ? 0.08 : -0.08;
-    if (target === "cover") {
-      updateCoverCrop({ cropScale: round(clamp((cover.cropScale || 1) + delta, 0.6, 3)) });
+  function applyLayout(name) {
+    setLayoutName(name);
+    if (selectedPage === 'cover') return;
+    setPages((prev) => {
+      const oldPage = prev[selectedPage] || createSpreadPage(name);
+      const existingPhotos = oldPage.frames.map((f) => f.photoId).filter(Boolean);
+      const newPage = createSpreadPage(name);
+      newPage.frames = newPage.frames.map((frame, index) => ({ ...frame, photoId: existingPhotos[index] || null }));
+      newPage.texts = oldPage.texts;
+      return { ...prev, [selectedPage]: newPage };
+    });
+  }
+
+  function autoMount() {
+    if (!photos.length) {
+      alert('Importe fotos primeiro.');
       return;
     }
-    if (!frame) return;
-    setSpreads((prev) => prev.map((spread, sIndex) => {
-      if (sIndex !== active.index) return spread;
-      return { ...spread, frames: spread.frames.map((item) => item.id === frame.id ? { ...item, cropScale: round(clamp((item.cropScale || 1) + delta, 0.6, 3)) } : item) };
-    }));
+    setPages((prev) => {
+      const next = { ...prev };
+      let cursor = 1;
+      spreadNumbers.forEach((number) => {
+        const page = next[number] || createSpreadPage(layoutName);
+        next[number] = {
+          ...page,
+          frames: page.frames.map((frame) => {
+            if (frame.photoId) return frame;
+            const photo = photos[cursor % photos.length];
+            cursor += 1;
+            return { ...frame, photoId: photo.id, scale: 1, offsetX: 0, offsetY: 0 };
+          })
+        };
+      });
+      return next;
+    });
+  }
+
+  function insertPageAfter() {
+    const newIndex = selectedPage === 'cover' ? 1 : Number(selectedPage) + 1;
+    setPageCount((prev) => prev + 2);
+    setPages((prev) => {
+      const next = { cover: prev.cover };
+      const keys = Array.from({ length: totalSpreads + 1 }, (_, i) => i + 1);
+      keys.forEach((key) => {
+        if (key < newIndex) next[key] = prev[key] || createSpreadPage(layoutName);
+        else if (key === newIndex) next[key] = createSpreadPage(layoutName);
+        else next[key] = prev[key - 1] || createSpreadPage(layoutName);
+      });
+      return next;
+    });
+    setSelectedPage(newIndex);
+  }
+
+  function duplicatePage() {
+    if (selectedPage === 'cover') return;
+    const cloneIndex = Number(selectedPage) + 1;
+    setPageCount((prev) => prev + 2);
+    setPages((prev) => {
+      const clone = JSON.parse(JSON.stringify(prev[selectedPage] || createSpreadPage(layoutName)));
+      clone.frames = clone.frames.map((f) => ({ ...f, id: uid('frame') }));
+      clone.texts = clone.texts.map((t) => ({ ...t, id: uid('text') }));
+      const next = { cover: prev.cover };
+      Array.from({ length: totalSpreads + 1 }, (_, i) => i + 1).forEach((key) => {
+        if (key < cloneIndex) next[key] = prev[key] || createSpreadPage(layoutName);
+        else if (key === cloneIndex) next[key] = clone;
+        else next[key] = prev[key - 1] || createSpreadPage(layoutName);
+      });
+      return next;
+    });
+    setSelectedPage(cloneIndex);
+  }
+
+  function removePage() {
+    if (selectedPage === 'cover' || totalSpreads <= 10) return;
+    const removeIndex = Number(selectedPage);
+    setPageCount((prev) => prev - 2);
+    setPages((prev) => {
+      const next = { cover: prev.cover };
+      Array.from({ length: totalSpreads - 1 }, (_, i) => i + 1).forEach((key) => {
+        if (key < removeIndex) next[key] = prev[key] || createSpreadPage(layoutName);
+        else next[key] = prev[key + 1] || createSpreadPage(layoutName);
+      });
+      return next;
+    });
+    setSelectedPage(Math.max(1, removeIndex - 1));
   }
 
   function saveProject() {
-    const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5", JSON.stringify(payload));
-    setSavedAt(new Date());
-    setModal({ type: "saved" });
+    localStorage.setItem('diagramador_picmimos_v6', JSON.stringify({ format, pageCount, texture, pages }));
+    setExportNotice('Projeto salvo no navegador. No próximo passo real, isso vai para servidor/WooCommerce.');
+    setTimeout(() => setExportNotice(''), 3600);
   }
 
-  function getProjectPayload() {
-    return {
-      version: "V5",
-      product: "Meia Capa Fotográfica",
-      format: format.label,
-      pages: pageCount,
-      laminas: pageCount / 2,
-      spineCm,
-      texture: texture.label,
-      safetyMarginCm: SAFETY_MARGIN_CM,
-      production: {
-        output: "JPG limpo",
-        dpi: 300,
-        paper: "Fuji com UV Fosco",
-        cover: "Somente frente fotográfica; verso/lombada revestimento",
-      },
-      cover,
-      spreads,
-      photosCount: photos.length,
-      savedAt: new Date().toISOString(),
-    };
+  function previewProject() {
+    setExportNotice('Pré-visualização V6: a capa e as lâminas já estão montadas visualmente. Preview 3D real fica para etapa seguinte.');
+    setTimeout(() => setExportNotice(''), 4200);
   }
 
-  async function makePreview() {
-    try {
-      const node = stageRef.current;
-      const dataUrl = node ? await htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: "#f6f2eb" }) : null;
-      setModal({ type: "preview", dataUrl });
-    } catch (error) {
-      console.error(error);
-      setModal({ type: "preview", dataUrl: null });
+  function finishProject() {
+    if (!coverOk) {
+      setFinishNotice('Bloqueado: a foto da capa frontal é obrigatória. Clique na capa e envie/arraste uma foto.');
+      setSelectedPage('cover');
+      setSelected({ kind: 'frame', id: 'cover-photo' });
+      return;
     }
+    const blankSpreads = spreadNumbers.filter((n) => !pages[n] || pages[n].frames.every((f) => !f.photoId));
+    if (blankSpreads.length) {
+      setFinishNotice(`Atenção: ${blankSpreads.length} lâmina(s) ainda estão em branco. Na versão real, o cliente deverá confirmar antes de enviar para produção.`);
+      return;
+    }
+    setFinishNotice('Projeto pronto para a próxima etapa: carrinho WooCommerce/exportação JPG.');
   }
 
-  function finalizeProject() {
-    const emptySpreads = spreads.map((spread, index) => ({ spread, index })).filter(({ spread }) => !spread.frames.length);
-    const problems = [];
-    if (!cover.photoId) problems.push("A capa frontal ainda não tem foto.");
-    if (emptySpreads.length) problems.push(`${emptySpreads.length} lâmina(s) do miolo estão vazias.`);
-    setModal({ type: "finalize", problems, emptySpreads });
+  function renderFrame(frame) {
+    const photo = photos.find((p) => p.id === frame.photoId);
+    const isSelected = selected?.kind === 'frame' && selected.id === frame.id;
+    const canResize = !frame.lockedResize;
+    const canMove = !frame.lockedMove;
+    const maxPan = Math.max(0, (((frame.scale || 1) - 1) / (frame.scale || 1)) * 50);
+    const offsetX = clamp(frame.offsetX || 0, -maxPan, maxPan);
+    const offsetY = clamp(frame.offsetY || 0, -maxPan, maxPan);
+
+    return (
+      <div
+        key={frame.id}
+        className={`photo-frame ${isSelected ? 'selected' : ''} ${dragHoverId === frame.id ? 'drop-hover' : ''} ${frame.lockedResize ? 'locked' : ''}`}
+        style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
+        onClick={(event) => { event.stopPropagation(); setSelected({ kind: 'frame', id: frame.id }); }}
+        onDragOver={(event) => { event.preventDefault(); setDragHoverId(frame.id); }}
+        onDragLeave={() => setDragHoverId(null)}
+        onDrop={(event) => handleDropOnFrame(event, frame.id)}
+        onWheel={(event) => handlePhotoWheel(event, frame)}
+      >
+        {photo ? (
+          <img
+            className="frame-photo"
+            src={photo.url}
+            alt={photo.name}
+            draggable="false"
+            onPointerDown={(event) => startPanPhoto(event, frame)}
+            style={{
+              transform: `translate(-50%, -50%) translate(${offsetX}%, ${offsetY}%) scale(${Math.max(1, frame.scale || 1)})`
+            }}
+          />
+        ) : (
+          <button className="empty-frame-button" onClick={(event) => { event.stopPropagation(); setSelected({ kind: 'frame', id: frame.id }); fileInputRef.current?.click(); }}>
+            <span>＋</span>
+            Foto
+          </button>
+        )}
+
+        <div className="frame-number">{frame.label}</div>
+        {photo && <div className="used-badge">usada</div>}
+        {isSelected && photo && <div className="pan-hint">Arraste a foto para enquadrar • roda do mouse aproxima</div>}
+        {isSelected && (
+          <>
+            {canMove && (
+              <button className="move-handle" onPointerDown={(event) => startMove(event, 'frame', frame)} title="Mover quadro">
+                mover
+              </button>
+            )}
+            {photo && (
+              <button
+                className="swap-handle"
+                draggable
+                onDragStart={(event) => {
+                  event.stopPropagation();
+                  event.dataTransfer.setData('application/json', JSON.stringify({ type: 'frame', page: selectedPage, frameId: frame.id }));
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
+                title="Arraste para outro quadro para trocar as fotos"
+              >
+                trocar
+              </button>
+            )}
+            {canResize && ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((handle) => (
+              <span key={handle} className={`resize-handle ${handle}`} onPointerDown={(event) => startResize(event, 'frame', frame, handle)} />
+            ))}
+          </>
+        )}
+      </div>
+    );
   }
 
-  function simulatedExport() {
-    const files = [
-      "00-FICHA-PRODUCAO.html",
-      "00-DADOS-PEDIDO.json",
-      "00-PREVIEW.jpg",
-      "01-CAPA-FRENTE.jpg",
-      ...spreads.map((_, index) => `${String(index + 2).padStart(2, "0")}-LAMINA-${String(index + 1).padStart(2, "0")}.jpg`),
-    ];
-    setModal({ type: "export", files });
+  function renderText(text) {
+    const isSelected = selected?.kind === 'text' && selected.id === text.id;
+    return (
+      <div
+        key={text.id}
+        className={`text-box ${isSelected ? 'selected' : ''}`}
+        style={{
+          left: `${text.x}%`,
+          top: `${text.y}%`,
+          width: `${text.w}%`,
+          height: `${text.h}%`,
+          fontFamily: text.font,
+          fontSize: `${text.size}px`,
+          color: text.color,
+          fontWeight: text.bold ? 800 : 500,
+          textAlign: text.align
+        }}
+        onClick={(event) => { event.stopPropagation(); setSelected({ kind: 'text', id: text.id }); }}
+      >
+        <div
+          className="editable-text"
+          contentEditable={isSelected}
+          suppressContentEditableWarning
+          onInput={(event) => updateText(text.id, { text: event.currentTarget.innerText })}
+          onBlur={(event) => updateText(text.id, { text: event.currentTarget.innerText })}
+        >
+          {text.text}
+        </div>
+        {isSelected && (
+          <>
+            <button className="text-move-handle" onPointerDown={(event) => startMove(event, 'text', text)} title="Mover texto">mover</button>
+            {['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((handle) => (
+              <span key={handle} className={`resize-handle ${handle}`} onPointerDown={(event) => startResize(event, 'text', text, handle)} />
+            ))}
+          </>
+        )}
+      </div>
+    );
   }
 
-  const activeLabel = active.type === "cover" ? "Capa" : currentSpread?.name;
-  const currentPhotoForPanel = active.type === "cover" ? photoMap.get(cover.photoId) : selectedFrame?.photoId ? photoMap.get(selectedFrame.photoId) : null;
-  const selectedText = selectedTextId?.scope === "cover" && active.type === "cover"
-    ? cover.texts.find((text) => text.id === selectedTextId.id)
-    : selectedTextId?.scope === "spread" && active.type === "spread" && selectedTextId.spreadIndex === active.index
-      ? currentSpread?.texts.find((text) => text.id === selectedTextId.id)
-      : null;
+  function renderCanvas() {
+    const page = currentPage;
+    const isCover = selectedPage === 'cover';
+    return (
+      <div className="canvas-wrap" onClick={() => setSelected(null)}>
+        <div ref={canvasRef} className={`design-canvas ${isCover ? 'cover-canvas-v6' : 'spread-canvas-v6'}`}>
+          {isCover ? (
+            <>
+              <div className="cover-back" style={textureStyle(texture)}><span>Verso bloqueado</span></div>
+              <div className="cover-spine" style={textureStyle(texture)}><span>{pageCount / 2}mm</span></div>
+              <div className="cover-front-area" />
+            </>
+          ) : (
+            <>
+              <div className="paper-grid" />
+              <div className="page-label left">Página esquerda</div>
+              <div className="page-label right">Página direita</div>
+              <div className="center-fold" />
+            </>
+          )}
+          <div className="safe-margin">
+            <span>Margem de segurança 0,3 cm</span>
+          </div>
+          {page.frames.map(renderFrame)}
+          {page.texts.map(renderText)}
+          {guides.map((guide, index) => (
+            <div key={`${guide.type}-${index}`} className={`snap-line ${guide.type}`} style={guide.type === 'v' ? { left: `${guide.posPercent}%` } : { top: `${guide.posPercent}%` }}>
+              <span>{guide.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderRightPanel() {
+    if (selected?.kind === 'text' && selectedElement) {
+      const text = selectedElement;
+      return (
+        <aside className="right-panel">
+          <h3>Ajustes</h3>
+          <label>Texto</label>
+          <textarea value={text.text} onChange={(event) => updateText(text.id, { text: event.target.value })} />
+          <label>Fonte</label>
+          <select value={text.font} onChange={(event) => updateText(text.id, { font: event.target.value })}>
+            <option>Montserrat</option>
+            <option>Georgia</option>
+            <option>Arial</option>
+            <option>Times New Roman</option>
+            <option>Verdana</option>
+          </select>
+          <label>Tamanho</label>
+          <input type="range" min="12" max="120" value={text.size} onChange={(event) => updateText(text.id, { size: Number(event.target.value) })} />
+          <small>{text.size}px</small>
+          <label>Cor</label>
+          <div className="color-row">
+            {['#111111', '#ffffff', '#e2ad3b', '#5f5f5b', '#285b43', '#a63234'].map((color) => (
+              <button key={color} className={`color-dot ${text.color === color ? 'selected' : ''}`} style={{ background: color }} onClick={() => updateText(text.id, { color })} />
+            ))}
+          </div>
+          <div className="panel-grid">
+            <button onClick={() => updateText(text.id, { bold: !text.bold })}>{text.bold ? 'Sem negrito' : 'Negrito'}</button>
+            <button onClick={() => updateText(text.id, { align: text.align === 'center' ? 'left' : text.align === 'left' ? 'right' : 'center' })}>Alinhar</button>
+          </div>
+          <button className="danger" onClick={deleteSelected}>Apagar texto</button>
+          <p className="panel-help">V6: o texto agora também redimensiona direto no diagramador pelas alças amarelas.</p>
+        </aside>
+      );
+    }
+
+    if (selected?.kind === 'frame' && selectedElement) {
+      const frame = selectedElement;
+      const photo = selectedPhoto;
+      return (
+        <aside className="right-panel">
+          <h3>Ajustes</h3>
+          {photo ? <img className="selected-preview" src={photo.url} alt={photo.name} /> : <div className="empty-preview">Sem foto</div>}
+          <h4>Foto selecionada</h4>
+          <p>Arraste a foto dentro do quadro para reposicionar. Use a rolagem do mouse ou o controle abaixo para aproximar.</p>
+          <label>Zoom mínimo bloqueado</label>
+          <input
+            type="range"
+            min="1"
+            max="3"
+            step="0.01"
+            value={Math.max(1, frame.scale || 1)}
+            onChange={(event) => {
+              const scale = Math.max(1, Number(event.target.value));
+              const maxPan = Math.max(0, ((scale - 1) / scale) * 50);
+              updateFrame(frame.id, {
+                scale,
+                offsetX: clamp(frame.offsetX || 0, -maxPan, maxPan),
+                offsetY: clamp(frame.offsetY || 0, -maxPan, maxPan)
+              });
+            }}
+          />
+          <small>{Math.round(Math.max(1, frame.scale || 1) * 100)}%</small>
+          <label>Horizontal</label>
+          <input type="range" min="-50" max="50" value={frame.offsetX || 0} onChange={(event) => updateFrame(frame.id, { offsetX: Number(event.target.value) })} />
+          <label>Vertical</label>
+          <input type="range" min="-50" max="50" value={frame.offsetY || 0} onChange={(event) => updateFrame(frame.id, { offsetY: Number(event.target.value) })} />
+          <div className="panel-grid">
+            <button onClick={() => updateFrame(frame.id, { scale: 1, offsetX: 0, offsetY: 0 })}>Centralizar</button>
+            <button onClick={() => fileInputRef.current?.click()}>Trocar foto</button>
+          </div>
+          {!frame.lockedResize && <p className="panel-help">V6: arraste as alças amarelas do quadro para redimensionar. Linhas magnéticas aparecem quando alinhar com outro quadro.</p>}
+          <button className="danger" onClick={deleteSelected}>Limpar foto</button>
+        </aside>
+      );
+    }
+
+    return (
+      <aside className="right-panel">
+        <h3>Ajustes</h3>
+        <p>Selecione uma foto ou texto para editar.</p>
+        <button onClick={addText}>Inserir texto</button>
+      </aside>
+    );
+  }
+
+  function renderPageStrip() {
+    return (
+      <div className="page-strip">
+        <button className={selectedPage === 'cover' ? 'active' : ''} onClick={() => { setSelectedPage('cover'); ensurePage('cover'); setSelected({ kind: 'frame', id: 'cover-photo' }); }}>
+          <span className="mini-cover" style={textureStyle(texture)}>{coverOk && <span className="ok-dot">ok</span>}</span>
+          <strong>Capa</strong>
+          <small>{coverOk ? 'ok' : 'sem foto'}</small>
+        </button>
+        {spreadNumbers.map((n) => {
+          const page = pages[n];
+          const used = page?.frames?.filter((f) => f.photoId).length || 0;
+          return (
+            <button key={n} className={selectedPage === n ? 'active' : ''} onClick={() => { ensurePage(n); setSelectedPage(n); setSelected(null); }}>
+              <span className="mini-spread">{page?.frames?.slice(0, 4).map((frame) => frame.photoId ? <i key={frame.id} /> : null)}</span>
+              <strong>Página {n * 2 - 1}-{n * 2}</strong>
+              <small>{used ? `${used} foto(s)` : 'em branco'}</small>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderPhotoStrip() {
+    return (
+      <div className="photo-strip">
+        {photos.map((photo, index) => {
+          const uses = Object.values(pages).flatMap((page) => page.frames || []).filter((frame) => frame.photoId === photo.id).length;
+          return (
+            <button
+              key={photo.id}
+              className={`library-photo ${uses ? 'used' : ''}`}
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.setData('application/json', JSON.stringify({ type: 'photo', photoId: photo.id }));
+                event.dataTransfer.effectAllowed = 'copy';
+              }}
+              onClick={() => handleLibraryClick(photo)}
+              title="Clique para aplicar na seleção ou arraste para trocar"
+            >
+              <img src={photo.url} alt={photo.name} />
+              <span className="photo-index">{index + 1}</span>
+              {uses > 0 && <span className="use-count">usada {uses > 1 ? uses : ''}</span>}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
-    <div className="app-shell">
+    <main className="app-shell">
+      <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={handleSelectFiles} />
       <header className="topbar">
-        <div className="brand">
-          <div className="logo">P</div>
-          <div>
-            <strong>Diagramador Picmimos V5</strong>
-            <span>Meia Capa Fotográfica · upload de capa + texto editável</span>
-          </div>
+        <div className="brand-mark">P</div>
+        <div>
+          <strong>Diagramador Picmimos V6</strong>
+          <span>Meia Capa Fotográfica · resize manual + snap magnético</span>
         </div>
         <div className="top-actions">
-          <Button variant="secondary" onClick={saveProject}>Salvar projeto</Button>
-          <Button variant="secondary" onClick={makePreview}>Pré-visualizar</Button>
-          <Button variant="warning" onClick={finalizeProject}>Finalizar</Button>
+          <button onClick={saveProject}>Salvar projeto</button>
+          <button onClick={previewProject}>Pré-visualizar</button>
+          <button className="finish" onClick={finishProject}>Finalizar</button>
         </div>
       </header>
 
-      <aside className="left-panel">
-        <section className="panel-card">
-          <h3>Produto</h3>
-          <label>Formato fechado</label>
-          <select value={formatId} onChange={(e) => setFormatId(e.target.value)}>
-            {FORMATS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
+      <section className="editor-layout">
+        <aside className="left-panel">
+          <section className="panel-card">
+            <h3>Produto</h3>
+            <label>Formato fechado</label>
+            <select value={format.id} onChange={(event) => setFormat(FORMATS.find((item) => item.id === event.target.value) || FORMATS[3])}>
+              {FORMATS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            <label>Quantidade de páginas</label>
+            <select value={pageCount} onChange={(event) => setPageCount(Number(event.target.value))}>
+              {PAGE_OPTIONS.map((count) => <option key={count} value={count}>{count} páginas ({count / 2} lâminas)</option>)}
+            </select>
+            <label>Textura do verso/lombada</label>
+            <select value={texture.id} onChange={(event) => setTexture(TEXTURES.find((item) => item.id === event.target.value) || TEXTURES[0])}>
+              {TEXTURES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+            <div className="spec-grid">
+              <span><small>Miolo</small><b>{format.spread}</b></span>
+              <span><small>Lombada</small><b>{pageCount / 2} mm</b></span>
+              <span><small>Refilo</small><b>3 mm total</b></span>
+              <span><small>Saída</small><b>JPG limpo</b></span>
+            </div>
+          </section>
 
-          <label>Quantidade de páginas</label>
-          <select value={pageCount} onChange={(e) => handlePagesChange(e.target.value)}>
-            {Array.from({ length: (MAX_PAGES - MIN_PAGES) / 2 + 1 }, (_, i) => MIN_PAGES + i * 2).map((p) => <option key={p} value={p}>{p} páginas ({p / 2} lâminas)</option>)}
-          </select>
+          <section className="panel-card">
+            <h3>Fotos</h3>
+            <div className="button-row">
+              <button className="dark" onClick={() => fileInputRef.current?.click()}>Importar fotos</button>
+              <button onClick={() => setPhotos(DEMO_PHOTOS)}>Fotos demo</button>
+            </div>
+            <button className="plain" onClick={() => setPhotos([])}>Limpar biblioteca</button>
+            <p>Clique para aplicar na seleção. Arraste para cima de um quadro para substituir. Para trocar foto entre quadros, use o botão “trocar” no quadro selecionado.</p>
+          </section>
+        </aside>
 
-          <label>Textura do verso/lombada</label>
-          <select value={textureId} onChange={(e) => setTextureId(e.target.value)}>
-            {TEXTURES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
-
-          <div className="spec-grid">
-            <div><span>Miolo</span><strong>{format.spreadW} x {format.spreadH} cm</strong></div>
-            <div><span>Lombada</span><strong>{(spineCm * 10).toFixed(0)} mm</strong></div>
-            <div><span>Refilo</span><strong>3 mm total</strong></div>
-            <div><span>Saída</span><strong>JPG limpo</strong></div>
+        <section className="main-stage">
+          <div className="stage-toolbar">
+            <div>
+              <strong>{getPageTitle(selectedPage)}</strong>
+              <span>{format.spread} · Fuji UV Fosco</span>
+            </div>
+            <div className="toolbar-actions">
+              {selectedPage !== 'cover' && <button onClick={autoMount}>Montar automático</button>}
+              {selectedPage !== 'cover' && <button onClick={() => applyLayout('magazine5')}>Layout 5</button>}
+              {selectedPage !== 'cover' && <button onClick={() => applyLayout('grid4')}>Layout 8</button>}
+              {selectedPage !== 'cover' && <button onClick={() => applyLayout('hero2')}>Layout 2</button>}
+              <button className="margin-pill">Margem 0,3 cm</button>
+              <button onClick={addText}>Texto</button>
+              <button className="clear" onClick={deleteSelected}>Limpar</button>
+            </div>
           </div>
+
+          {renderCanvas()}
+          {finishNotice && <div className="notice warning">{finishNotice}</div>}
+          {exportNotice && <div className="notice">{exportNotice}</div>}
         </section>
 
-        <section className="panel-card">
-          <h3>Fotos</h3>
-          <div className="button-grid">
-            <Button onClick={() => fileInputRef.current?.click()}>Importar fotos</Button>
-            <Button variant="secondary" onClick={loadDemo}>Fotos demo</Button>
-          </div>
-          <Button variant="ghost" onClick={() => { setPhotos([]); setSelectedPhotoIds([]); }}>Limpar biblioteca</Button>
-          <p className="hint">Clique para selecionar. Shift seleciona intervalo. Ctrl/Alt adiciona. Arraste para capa ou lâmina.</p>
-        </section>
-      </aside>
-
-      <main className="workspace">
-        <div className="workspace-toolbar">
-          <div>
-            <strong>{activeLabel}</strong>
-            <span>{active.type === "cover" ? "Frente editável + verso/lombada texturizados" : `${format.spreadW} x ${format.spreadH} cm · Fuji UV Fosco`}</span>
-          </div>
-          <div className="toolbar-actions">
-            {active.type === "spread" && <Button variant="secondary" onClick={autoBuildCurrentSpread}>Montar automático</Button>}
-            {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>}
-            {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>}
-            <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Margem 0,3 cm</Button>
-            <Button variant="secondary" onClick={addText}>Texto</Button>
-            <Button variant="danger" onClick={clearActive}>Limpar</Button>
-          </div>
-        </div>
-
-        <div className="stage-holder" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
-          <div ref={stageRef} className={`stage ${active.type}`} style={{ aspectRatio: activeAspect }}>
-            {active.type === "cover" ? (
-              <CoverStage
-                cover={cover}
-                photoMap={photoMap}
-                texture={texture}
-                format={format}
-                spineCm={spineCm}
-                showSafety={showSafety}
-                selectedPhotoIds={selectedPhotoIds}
-                onPickCoverPhoto={() => coverFileInputRef.current?.click()}
-                onUseSelected={(photoId) => photoId ? applyPhotoToCover(photoId) : applySelectedToCover()}
-                onPhotoPan={startPhotoPan}
-                onPhotoWheel={zoomPhoto}
-                selectedTextId={selectedTextId}
-                onSelectText={setSelectedTextId}
-                onMoveText={startTextMove}
-                onChangeText={updateText}
-              />
-            ) : (
-              <SpreadStage
-                spread={currentSpread}
-                spreadIndex={active.index}
-                photoMap={photoMap}
-                showSafety={showSafety}
-                onSelectFrame={(id) => { setSelectedFrameId(id); setSelectedTextId(null); }}
-                selectedFrameId={selectedFrameId}
-                onDropPhoto={applyPhotoToFrame}
-                onPhotoPan={startPhotoPan}
-                onPhotoWheel={zoomPhoto}
-                selectedTextId={selectedTextId}
-                onSelectText={setSelectedTextId}
-                onMoveText={startTextMove}
-                onChangeText={updateText}
-              />
-            )}
-          </div>
-        </div>
-      </main>
-
-      <aside className="right-panel">
-        <section className="panel-card">
-          <h3>Ajustes</h3>
-          {selectedText ? (
-            <TextControls text={selectedText} onChange={updateSelectedText} onRemove={removeSelectedText} />
-          ) : active.type === "cover" ? (
-            <CropControls label="Foto da capa" photo={currentPhotoForPanel} target={cover} onChange={updateCoverCrop} emptyText="Clique no ícone de upload dentro da capa ou arraste uma foto para a frente." />
-          ) : selectedFrame ? (
-            <CropControls label="Foto selecionada" photo={currentPhotoForPanel} target={selectedFrame} onChange={updateFrameCrop} />
-          ) : (
-            <div className="empty-state">Clique em uma foto da lâmina para ajustar zoom/enquadramento, ou arraste outra foto para trocar.</div>
-          )}
-        </section>
-
-        <section className="panel-card">
-          <h3>Páginas</h3>
-          <div className="button-grid">
-            <Button variant="secondary" onClick={insertBlankSpread}>Inserir</Button>
-            <Button variant="secondary" onClick={duplicateSpread}>Duplicar</Button>
-            <Button variant="danger" onClick={removeSpread}>Remover</Button>
-            <Button variant="secondary" onClick={simulatedExport}>Exportação</Button>
-          </div>
-          <p className="hint">A exportação real em JPG 300 DPI será feita depois que o fluxo visual estiver aprovado.</p>
-        </section>
-
-        <section className="panel-card">
-          <h3>Status</h3>
-          <ul className="status-list">
-            <li><span>Capa com foto</span><strong>{cover.photoId ? "Sim" : "Não"}</strong></li>
-            <li><span>Lâminas vazias</span><strong>{spreads.filter((s) => !s.frames.length).length}</strong></li>
-            <li><span>Fotos usadas</span><strong>{usedPhotoIds.size}/{photos.length}</strong></li>
-            <li><span>Salvo</span><strong>{savedAt ? savedAt.toLocaleTimeString("pt-BR") : "Ainda não"}</strong></li>
-          </ul>
-        </section>
-      </aside>
-
-      <section className="filmstrip">
-        <div className="spread-strip">
-          <button className={`thumb-nav ${active.type === "cover" ? "on" : ""}`} onClick={() => setActive({ type: "cover", index: 0 })}>
-            <span>Capa</span>
-            <small>{cover.photoId ? "ok" : "vazia"}</small>
-          </button>
-          {spreads.map((spread, index) => (
-            <button key={spread.id} className={`thumb-nav ${active.type === "spread" && active.index === index ? "on" : ""}`} onClick={() => { setActive({ type: "spread", index }); setSelectedFrameId(null); }}>
-              <span>{spread.name}</span>
-              <small>{spread.frames.length ? `${spread.frames.length} foto(s)` : "em branco"}</small>
-            </button>
-          ))}
-        </div>
-        <div className="photo-strip">
-          {photos.length ? photos.map((photo, index) => (
-            <button
-              key={photo.id}
-              className={`photo-tile ${selectedPhotoIds.includes(photo.id) ? "selected" : ""} ${usedPhotoIds.has(photo.id) ? "used" : ""}`}
-              onClick={(event) => togglePhoto(photo.id, event)}
-              draggable
-              onDragStart={(event) => event.dataTransfer.setData("photo/id", photo.id)}
-              title={photo.name}
-            >
-              <img src={photo.src} alt="" />
-              <span className="photo-index">{index + 1}</span>
-              {selectedPhotoIds.includes(photo.id) && <b>{selectedPhotoIds.indexOf(photo.id) + 1}</b>}
-              {usedPhotoIds.has(photo.id) && <small>usada</small>}
-            </button>
-          )) : <div className="filmstrip-empty">Importe fotos ou clique em “Fotos demo”.</div>}
-        </div>
+        {renderRightPanel()}
       </section>
 
-      <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => importFiles(e.target.files)} />
-      <input ref={coverFileInputRef} type="file" accept="image/*" hidden onChange={(e) => importCoverFiles(e.target.files)} />
-      {modal && <Modal modal={modal} onClose={() => setModal(null)} onExport={simulatedExport} />}
-    </div>
-  );
-}
-
-function CoverStage({
-  cover,
-  photoMap,
-  texture,
-  format,
-  spineCm,
-  showSafety,
-  selectedPhotoIds,
-  onPickCoverPhoto,
-  onUseSelected,
-  onPhotoPan,
-  onPhotoWheel,
-  selectedTextId,
-  onSelectText,
-  onMoveText,
-  onChangeText,
-}) {
-  const photo = cover.photoId ? photoMap.get(cover.photoId) : null;
-  const total = format.closedW * 2 + spineCm;
-  const backPct = (format.closedW / total) * 100;
-  const spinePct = (spineCm / total) * 100;
-  const frontPct = backPct;
-
-  return (
-    <div className="cover-layout">
-      <div className="cover-back" style={{ width: `${backPct}%`, background: texture.css }}>
-        <span>Verso bloqueado</span>
-      </div>
-      <div className="cover-spine" style={{ width: `${spinePct}%`, minWidth: 8, background: texture.css }}>
-        <span>{(spineCm * 10).toFixed(0)}mm</span>
-      </div>
-      <div
-        className={`cover-front ${!photo ? "needs-photo" : ""}`}
-        style={{ width: `${frontPct}%` }}
-        onDrop={(event) => {
-          event.preventDefault();
-          const photoId = event.dataTransfer.getData("photo/id");
-          if (photoId) {
-            onUseSelected(photoId);
-          }
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onWheel={(event) => photo && onPhotoWheel(event, "cover")}
-        onPointerDown={(event) => photo && onPhotoPan(event, "cover")}
-      >
-        {photo ? <Photo src={photo.src} frame={cover} /> : (
-          <div className="cover-upload-zone" onPointerDown={(event) => event.stopPropagation()}>
-            <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto} title="Enviar foto da capa">
-              <span>☁</span>
-              <strong>Enviar foto da capa</strong>
-              <small>Obrigatório para finalizar este modelo</small>
-            </button>
-            {selectedPhotoIds?.length ? (
-              <button type="button" className="cover-selected-button" onClick={() => onUseSelected()}>
-                Usar foto selecionada
-              </button>
-            ) : null}
+      <footer className="bottom-area">
+        <div className="page-actions">
+          {renderPageStrip()}
+          <div className="page-buttons">
+            <button onClick={insertPageAfter}>Inserir</button>
+            <button onClick={duplicatePage}>Duplicar</button>
+            <button className="danger-soft" onClick={removePage}>Remover</button>
+            <button onClick={() => setExportNotice('Exportação real ainda será conectada: JPG 300 DPI, capa separada e miolo por lâmina.')}>Exportação</button>
           </div>
-        )}
-        {photo && (
-          <button type="button" className="cover-change-button" onClick={onPickCoverPhoto} onPointerDown={(event) => event.stopPropagation()}>
-            Trocar foto
-          </button>
-        )}
-        {showSafety && <div className="safety cover-safe">Margem de segurança 0,3 cm</div>}
-        {cover.texts.map((text) => (
-          <TextBox
-            key={text.id}
-            text={text}
-            scope="cover"
-            selected={selectedTextId?.scope === "cover" && selectedTextId?.id === text.id}
-            onSelect={() => onSelectText({ scope: "cover", id: text.id })}
-            onMove={(event) => onMoveText(event, text, "cover", 0)}
-            onChange={(value) => onChangeText(text.id, { value }, "cover", 0)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SpreadStage({
-  spread,
-  spreadIndex,
-  photoMap,
-  showSafety,
-  onSelectFrame,
-  selectedFrameId,
-  onDropPhoto,
-  onPhotoPan,
-  onPhotoWheel,
-  selectedTextId,
-  onSelectText,
-  onMoveText,
-  onChangeText,
-}) {
-  return (
-    <div className="spread-layout">
-      <div className="page-label left">Página esquerda</div>
-      <div className="page-label right">Página direita</div>
-      <div className="center-fold" />
-      {showSafety && <div className="safety spread-safe">Área segura 0,3 cm</div>}
-      {spread?.frames?.length ? spread.frames.map((frame, index) => {
-        const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
-        return (
-          <button
-            type="button"
-            key={frame.id}
-            className={`frame ${selectedFrameId === frame.id ? "selected" : ""}`}
-            style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
-            onClick={() => onSelectFrame(frame.id)}
-            onDrop={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const photoId = event.dataTransfer.getData("photo/id");
-              if (photoId) onDropPhoto(spreadIndex, frame.id, photoId);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onPointerDown={(event) => {
-              onSelectFrame(frame.id);
-              if (photo) onPhotoPan(event, "frame", frame.id, frame);
-            }}
-            onWheel={(event) => onPhotoWheel(event, "frame", frame)}
-            title="Arraste outra foto para trocar. Use a rolagem do mouse para aproximar."
-          >
-            <Photo src={photo?.src} frame={frame} />
-            <span>{index + 1}</span>
-          </button>
-        );
-      }) : <div className="blank-spread-message">Lâmina em branco. Selecione fotos e clique em “Montar automático”.</div>}
-      {spread?.texts?.map((text) => (
-        <TextBox
-          key={text.id}
-          text={text}
-          scope="spread"
-          selected={selectedTextId?.scope === "spread" && selectedTextId?.spreadIndex === spreadIndex && selectedTextId?.id === text.id}
-          onSelect={() => onSelectText({ scope: "spread", spreadIndex, id: text.id })}
-          onMove={(event) => onMoveText(event, text, "spread", spreadIndex)}
-          onChange={(value) => onChangeText(text.id, { value }, "spread", spreadIndex)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function TextBox({ text, scope, selected, onSelect, onMove, onChange }) {
-  return (
-    <div
-      className={`text-box ${selected ? "selected" : ""}`}
-      style={{
-        left: `${text.x}%`,
-        top: `${text.y}%`,
-        fontSize: `${text.size}px`,
-        color: text.color,
-        fontFamily: text.fontFamily,
-        fontWeight: text.weight,
-        textAlign: text.align,
-        pointerEvents: "auto",
-        outline: selected ? "2px solid rgba(245,202,99,.95)" : "1px dashed transparent",
-        borderRadius: 8,
-        padding: "4px 8px",
-        background: selected ? "rgba(255,255,255,.12)" : "transparent",
-      }}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-        onSelect();
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect();
-      }}
-      data-scope={scope}
-    >
-      <button
-        type="button"
-        className="text-move-handle"
-        onPointerDown={onMove}
-        title="Mover texto"
-        style={{
-          display: selected ? "grid" : "none",
-          position: "absolute",
-          left: -14,
-          top: -14,
-          width: 26,
-          height: 26,
-          placeItems: "center",
-          borderRadius: 999,
-          border: "1px solid rgba(0,0,0,.2)",
-          background: "#fff",
-          color: "#2c2824",
-          cursor: "move",
-          boxShadow: "0 4px 14px rgba(0,0,0,.18)",
-          zIndex: 2,
-        }}
-      >
-        ↕
-      </button>
-      <span
-        contentEditable
-        suppressContentEditableWarning
-        spellCheck={false}
-        onInput={(event) => onChange(event.currentTarget.textContent || "")}
-        onPointerDown={(event) => event.stopPropagation()}
-        style={{ cursor: "text", whiteSpace: "pre-wrap", minWidth: 40, display: "inline-block" }}
-      >
-        {text.value}
-      </span>
-    </div>
-  );
-}
-
-function TextControls({ text, onChange, onRemove }) {
-  return (
-    <div className="text-controls">
-      <label>Texto</label>
-      <input
-        type="text"
-        value={text.value}
-        onChange={(event) => onChange({ value: event.target.value })}
-        placeholder="Digite o texto"
-      />
-
-      <label>Fonte</label>
-      <select value={text.fontFamily} onChange={(event) => onChange({ fontFamily: event.target.value })}>
-        {TEXT_FONTS.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
-      </select>
-
-      <label>Tamanho</label>
-      <input type="range" min="10" max="90" step="1" value={text.size} onChange={(event) => onChange({ size: Number(event.target.value) })} />
-      <small>{text.size}px</small>
-
-      <label>Cor</label>
-      <div className="color-row" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0 10px" }}>
-        {TEXT_COLORS.map((color) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => onChange({ color })}
-            title={color}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 999,
-              border: text.color === color ? "3px solid #111" : "1px solid #ccc",
-              background: color,
-              cursor: "pointer",
-            }}
-          />
-        ))}
-        <input type="color" value={text.color} onChange={(event) => onChange({ color: event.target.value })} style={{ width: 42, height: 30, padding: 0 }} />
-      </div>
-
-      <div className="button-grid">
-        <Button variant={text.weight >= 800 ? "active" : "secondary"} onClick={() => onChange({ weight: text.weight >= 800 ? 400 : 900 })}>Negrito</Button>
-        <Button variant="secondary" onClick={() => onChange({ align: text.align === "center" ? "left" : text.align === "left" ? "right" : "center" })}>Alinhar</Button>
-      </div>
-      <Button variant="danger" onClick={onRemove}>Apagar texto</Button>
-      <p className="hint">Clique no texto para escrever. Use o botão redondo ao lado do texto para mover.</p>
-    </div>
-  );
-}
-
-function CropControls({ label, photo, target, onChange, emptyText = "Selecione uma foto no rodapé e aplique aqui." }) {
-  if (!photo) return <div className="empty-state">{emptyText}</div>;
-  return (
-    <div className="crop-controls">
-      <div className="crop-preview">
-        <img src={photo.src} alt="" />
-      </div>
-      <strong>{label}</strong>
-      <p className="hint">Arraste a foto no quadro para reposicionar. Use a rolagem do mouse para aproximar.</p>
-      <label>Zoom</label>
-      <input type="range" min="0.6" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
-      <label>Horizontal</label>
-      <input type="range" min="-80" max="80" step="1" value={target.cropX || 0} onChange={(e) => onChange({ cropX: Number(e.target.value) })} />
-      <label>Vertical</label>
-      <input type="range" min="-80" max="80" step="1" value={target.cropY || 0} onChange={(e) => onChange({ cropY: Number(e.target.value) })} />
-      <Button variant="secondary" onClick={() => onChange({ cropScale: 1, cropX: 0, cropY: 0 })}>Centralizar</Button>
-    </div>
-  );
-}
-
-function Modal({ modal, onClose, onExport }) {
-  return (
-    <div className="modal-backdrop">
-      <div className="modal-card">
-        {modal.type === "saved" && (
-          <>
-            <h2>Projeto salvo</h2>
-            <p>O projeto foi salvo no navegador para teste da V5.</p>
-          </>
-        )}
-        {modal.type === "preview" && (
-          <>
-            <h2>Pré-visualização</h2>
-            {modal.dataUrl ? <img className="preview-img" src={modal.dataUrl} alt="Prévia" /> : <div className="empty-state">Prévia simulada indisponível neste navegador.</div>}
-            <p>Esta é uma prévia visual. A prévia 3D interativa entra em uma fase posterior.</p>
-          </>
-        )}
-        {modal.type === "finalize" && (
-          <>
-            <h2>Conferência antes de finalizar</h2>
-            {modal.problems.length ? (
-              <div className="warning-box">
-                {modal.problems.map((p) => <p key={p}>⚠ {p}</p>)}
-              </div>
-            ) : <p className="success-box">Projeto sem alertas principais.</p>}
-            <label className="confirm-check"><input type="checkbox" /> Confirmo que revisei meu projeto e autorizo produção conforme exibido.</label>
-            <div className="modal-actions"><Button variant="secondary" onClick={onClose}>Voltar e revisar</Button><Button variant="warning" onClick={onExport}>Ver exportação simulada</Button></div>
-          </>
-        )}
-        {modal.type === "export" && (
-          <>
-            <h2>Exportação simulada</h2>
-            <p>Na próxima fase, estes arquivos serão JPGs reais em 300 DPI, prontos para a pasta de produção.</p>
-            <div className="file-list">{modal.files.map((file) => <code key={file}>{file}</code>)}</div>
-          </>
-        )}
-        {modal.type !== "finalize" && <div className="modal-actions"><Button onClick={onClose}>Fechar</Button></div>}
-      </div>
-    </div>
+        </div>
+        {renderPhotoStrip()}
+      </footer>
+    </main>
   );
 }

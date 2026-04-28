@@ -1,1 +1,1 @@
-V5 - upload direto na capa, texto editável, troca de fotos por arraste, zoom e enquadramento manual.
+V6 - resize manual de textos e quadros no canvas, snap magnético, troca de fotos por arraste entre quadros e biblioteca, zoom mínimo bloqueado.
