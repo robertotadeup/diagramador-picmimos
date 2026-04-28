@@ -1,20 +1,28 @@
-# Diagramador Picmimos V3.4 - Gabarito de capa
+# Diagramador Picmimos / Proalbuns V3.5
 
-Esta versão junta a V3.3 com a nova regra de gabarito da capa.
+Versão focada em fazer o preview 3D obedecer a configuração do produto.
 
-## Principal
+## O que esta versão mantém
 
-No modelo **Fotolivro Capa Fotográfica Personalizado**, o cliente deve:
+- Editor 2D aprovado.
+- Upload de fotos e fotos demo.
+- Montagem automática.
+- Crop/enquadramento dentro do container.
+- Botão Mover quadro separado do crop.
+- Troca de fotos entre containers.
+- Texto editável.
+- Overlay de fotos usadas.
+- Capa Fotográfica Personalizada com arte inteira.
+- Gabarito de capa por quantidade de lâminas.
 
-1. escolher formato e quantidade de páginas/lâminas;
-2. baixar o gabarito correto da capa;
-3. criar a arte completa no Photoshop, incluindo verso + lombada + frente;
-4. subir a arte pronta no editor.
+## Novo na V3.5
 
-A lombada segue a regra: **1 mm por lâmina**.
+- Preview 3D lê formato, modelo de capa, páginas, lâminas e lombada.
+- Cálculo visual da lombada no 3D segue 1 mm por lâmina.
+- Capa Fotográfica Personalizada usa a arte inteira para representar frente e lombada no 3D.
+- Outros modelos usam textura na lombada/verso e foto somente na frente.
+- Etiquetas de validação aparecem dentro do preview 3D.
 
-Exemplo: 46 páginas = 23 lâminas = lombada de 23 mm.
+## Importante
 
-## Observação
-
-O botão atual gera um SVG demonstrativo para validar a lógica. No produto final, o plugin WordPress/WooCommerce deverá entregar o PSD/PDF cadastrado pelo administrador do laboratório.
+Esta ainda é uma versão de preparação do 3D. O foco não é deixar o 3D perfeito como Sunpics; o foco é garantir que ele já obedeça as configurações comerciais e técnicas do álbum.

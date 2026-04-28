@@ -1,8 +1,9 @@
-V3.4 - Gabarito de capa por quantidade de lâminas
+V3.5 - Preview 3D lendo configuração de produto
 
-- Inclui a regra da V3.3: Capa Fotográfica Personalizada usa uma arte única para verso + lombada + frente.
-- Adiciona cálculo automático de lâminas e lombada: 1 mm por lâmina.
-- Adiciona painel de gabarito para Capa Fotográfica Personalizada.
-- Botão "Baixar gabarito" gera um SVG demonstrativo com verso, lombada, frente e margem de segurança.
-- Na versão final, o plugin WordPress/WooCommerce deve fornecer o gabarito PSD/PDF cadastrado pelo administrador do laboratório/encadernadora.
-- Mantém o editor 2D, timeline, crop, texto, troca de fotos e preview 3D sem refazer a estrutura.
+- Mantém tudo da V3.4: capa fotográfica personalizada com arte inteira e gabarito por lâminas.
+- O preview 3D agora recebe e exibe modelo de capa, formato, páginas, lâminas e lombada.
+- A escala do 3D considera o formato escolhido e a lombada calculada pela regra 1 mm por lâmina.
+- Capa Fotográfica Personalizada usa a arte inteira para extrair a frente e a lombada no 3D.
+- Demais modelos continuam com frente fotográfica e verso/lombada em textura.
+- Adiciona etiquetas no preview 3D para validar: modelo, formato, lombada e tipo de capa.
+- Não altera o editor 2D aprovado, timeline, crop, texto, troca de fotos, gabarito e fluxo de finalização.
