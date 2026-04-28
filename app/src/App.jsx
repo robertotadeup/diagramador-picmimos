@@ -110,63 +110,133 @@ function getSpineCm(pageCount) {
   return laminas * 0.1; // 1 mm por lâmina = 0,1 cm
 }
 
-function getLayouts(count, variant = 0) {
+function gapPct(format, gapMm, axis = "x") {
+  const cm = gapMm / 10;
+  const base = axis === "x" ? format.spreadW : format.spreadH;
+  return round((cm / base) * 100);
+}
+
+function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
   const safeCount = clamp(count, 1, 20);
+  const gapX = gapPct(format, gapMm, "x");
+  const gapY = gapPct(format, gapMm, "y");
   const layouts = [];
 
-  // Grade limpa
-  const cols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
-  const rows = Math.ceil(safeCount / cols);
-  layouts.push(gridLayout(safeCount, cols, rows, 0, 0.8, 100, 100, 0));
+  const grid = (n, cols, rows, x = 0, y = 0, w = 100, h = 100) => gridLayout(n, cols, rows, x, gapX, gapY, w, h, y);
 
-  // Destaque esquerdo
+  // 1) Grade limpa ocupando a lâmina inteira
+  const gridCols = safeCount <= 2 ? safeCount : Math.ceil(Math.sqrt(safeCount * 2));
+  const gridRows = Math.ceil(safeCount / gridCols);
+  layouts.push(grid(safeCount, gridCols, gridRows));
+
+  // 2) Foto única sempre ocupa tudo
   if (safeCount === 1) {
     layouts.push([{ x: 0, y: 0, w: 100, h: 100 }]);
-  } else {
-    const rest = safeCount - 1;
-    const rightCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-    const rightRows = Math.ceil(rest / rightCols);
-    const slots = [{ x: 0, y: 0, w: 58, h: 100 }];
-    const smalls = gridLayout(rest, rightCols, rightRows, 58.8, 0.8, 41.2, 100, 0);
-    layouts.push([...slots, ...smalls]);
   }
 
-  // Destaque direito
+  // 3) Uma grande à esquerda + mosaico à direita
   if (safeCount > 1) {
     const rest = safeCount - 1;
-    const leftCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
-    const leftRows = Math.ceil(rest / leftCols);
-    const smalls = gridLayout(rest, leftCols, leftRows, 0, 0.8, 41.2, 100, 0);
-    layouts.push([...smalls, { x: 47, y: 0, w: 53, h: 100 }]);
+    const bigW = 58;
+    const rightX = bigW + gapX;
+    const rightW = Math.max(8, 100 - rightX);
+    const rightCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
+    const rightRows = Math.ceil(rest / rightCols);
+    layouts.push([
+      { x: 0, y: 0, w: round(bigW), h: 100 },
+      ...grid(rest, rightCols, rightRows, rightX, 0, rightW, 100),
+    ]);
   }
 
-  // Editorial em faixa
+  // 4) Uma grande à direita + mosaico à esquerda
+  if (safeCount > 1) {
+    const rest = safeCount - 1;
+    const leftW = 41.2;
+    const bigX = leftW + gapX;
+    const bigW = Math.max(8, 100 - bigX);
+    const leftCols = rest <= 3 ? 1 : rest <= 8 ? 2 : 3;
+    const leftRows = Math.ceil(rest / leftCols);
+    layouts.push([
+      ...grid(rest, leftCols, leftRows, 0, 0, leftW, 100),
+      { x: round(bigX), y: 0, w: round(bigW), h: 100 },
+    ]);
+  }
+
+  // 5) Editorial: faixa superior + mosaico inferior
   if (safeCount >= 3) {
     const top = Math.min(3, safeCount);
     const bottom = safeCount - top;
-    const slots = gridLayout(top, top, 1, 0, 0.8, 100, 38, 0);
+    const topH = 39;
+    const bottomY = topH + gapY;
+    const bottomH = Math.max(8, 100 - bottomY);
+    const slots = grid(top, top, 1, 0, 0, 100, topH);
     if (bottom > 0) {
       const bCols = Math.ceil(Math.sqrt(bottom * 2));
       const bRows = Math.ceil(bottom / bCols);
-      slots.push(...gridLayout(bottom, bCols, bRows, 0, 0.8, 100, 61.2, 38.8));
+      slots.push(...grid(bottom, bCols, bRows, 0, bottomY, 100, bottomH));
     }
     layouts.push(slots.slice(0, safeCount));
   }
 
-  return layouts[variant % layouts.length] || layouts[0];
+  // 6) Smart-style: cada página tem sua própria composição
+  if (safeCount >= 2) {
+    const leftCount = Math.ceil(safeCount / 2);
+    const rightCount = safeCount - leftCount;
+    const leftCols = leftCount <= 2 ? 1 : 2;
+    const leftRows = Math.ceil(leftCount / leftCols);
+    const rightCols = rightCount <= 2 ? 1 : 2;
+    const rightRows = Math.max(1, Math.ceil(rightCount / rightCols));
+    const leftW = 50 - gapX / 2;
+    const rightX = 50 + gapX / 2;
+    const rightW = 50 - gapX / 2;
+    layouts.push([
+      ...grid(leftCount, leftCols, leftRows, 0, 0, leftW, 100),
+      ...grid(rightCount, rightCols, rightRows, rightX, 0, rightW, 100),
+    ].slice(0, safeCount));
+  }
+
+  // 7) Página esquerda editorial + foto grande na direita
+  if (safeCount >= 3) {
+    const leftCount = safeCount - 1;
+    const leftCols = leftCount <= 2 ? 1 : 2;
+    const leftRows = Math.ceil(leftCount / leftCols);
+    const leftW = 50 - gapX / 2;
+    const rightX = 50 + gapX / 2;
+    const rightW = 50 - gapX / 2;
+    layouts.push([
+      ...grid(leftCount, leftCols, leftRows, 0, 0, leftW, 100),
+      { x: round(rightX), y: 0, w: round(rightW), h: 100 },
+    ].slice(0, safeCount));
+  }
+
+  // 8) Foto grande no meio/direita com detalhes ao lado, bom para 4 a 8 fotos
+  if (safeCount >= 4) {
+    const sideCount = safeCount - 1;
+    const sideW = 33;
+    const bigX = sideW + gapX;
+    const bigW = Math.max(8, 100 - bigX);
+    const sideRows = Math.ceil(sideCount / 1);
+    layouts.push([
+      ...grid(sideCount, 1, sideRows, 0, 0, sideW, 100),
+      { x: round(bigX), y: 0, w: round(bigW), h: 100 },
+    ].slice(0, safeCount));
+  }
+
+  return layouts[((variant % layouts.length) + layouts.length) % layouts.length] || layouts[0];
 }
 
-function gridLayout(count, cols, rows, startX = 0, gap = 0.8, areaW = 100, areaH = 100, startY = 0) {
-  const cellW = (areaW - gap * (cols - 1)) / cols;
-  const cellH = (areaH - gap * (rows - 1)) / rows;
+function gridLayout(count, cols, rows, startX = 0, gapX = 0.8, gapY = 0.8, areaW = 100, areaH = 100, startY = 0) {
+  if (!count) return [];
+  const cellW = (areaW - gapX * (cols - 1)) / cols;
+  const cellH = (areaH - gapY * (rows - 1)) / rows;
   return Array.from({ length: count }, (_, index) => {
     const row = Math.floor(index / cols);
     const col = index % cols;
     return {
-      x: round(startX + col * (cellW + gap)),
-      y: round(startY + row * (cellH + gap)),
-      w: round(cellW),
-      h: round(cellH),
+      x: round(startX + col * (cellW + gapX)),
+      y: round(startY + row * (cellH + gapY)),
+      w: round(Math.max(4, cellW)),
+      h: round(Math.max(4, cellH)),
     };
   });
 }
@@ -175,8 +245,8 @@ function round(v) {
   return Math.round(v * 100) / 100;
 }
 
-function createFrames(photoIds, variant = 0) {
-  const slots = getLayouts(photoIds.length, variant);
+function createFrames(photoIds, variant = 0, format = FORMATS[3], gapMm = 1) {
+  const slots = getLayouts(photoIds.length, variant, format, gapMm);
   return slots.map((slot, index) => ({
     id: uid("frame"),
     photoId: photoIds[index],
@@ -310,6 +380,7 @@ export default function App() {
   const [selectedObjects, setSelectedObjects] = useState([]);
   const [guides, setGuides] = useState({ vertical: [], horizontal: [] });
   const [showSafety, setShowSafety] = useState(true);
+  const [frameGapMm, setFrameGapMm] = useState(1);
   const [modal, setModal] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
   const fileInputRef = useRef(null);
@@ -373,7 +444,10 @@ export default function App() {
       vertical.push(item.bounds.left, item.bounds.left + item.bounds.width / 2, item.bounds.left + item.bounds.width);
       horizontal.push(item.bounds.top, item.bounds.top + item.bounds.height / 2, item.bounds.top + item.bounds.height);
     });
-    if (active.type === "spread") vertical.push(50);
+    if (active.type === "spread") {
+      vertical.push(25, 50, 75);
+      horizontal.push(50);
+    }
     return { vertical, horizontal };
   }
 
@@ -536,6 +610,16 @@ export default function App() {
     applyPhotoToCover(id);
   }
 
+  function handleFrameGapChange(nextGap) {
+    setFrameGapMm(nextGap);
+    if (active.type !== "spread") return;
+    setSpreads((prev) => prev.map((spread, index) => {
+      if (index !== active.index || !spread.frames.length) return spread;
+      const photoIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
+      return { ...spread, frames: createFrames(photoIds, spread.layoutVariant || 0, format, nextGap) };
+    }));
+  }
+
   function autoBuildCurrentSpread() {
     if (active.type !== "spread") {
       alert("Clique em uma página do miolo no rodapé para montar a lâmina.");
@@ -546,7 +630,7 @@ export default function App() {
       ids = photos.filter((p) => !usedPhotoIds.has(p.id)).slice(0, 4).map((p) => p.id);
     }
     if (!ids.length) return alert("Importe ou selecione fotos primeiro.");
-    setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
+    setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0, format, frameGapMm) } : spread));
   }
 
   function changeLayout(direction) {
@@ -555,7 +639,7 @@ export default function App() {
       if (index !== active.index || !spread.frames.length) return spread;
       const nextVariant = (spread.layoutVariant || 0) + direction;
       const photoIds = spread.frames.map((frame) => frame.photoId).filter(Boolean);
-      return { ...spread, layoutVariant: nextVariant, frames: createFrames(photoIds, ((nextVariant % 4) + 4) % 4) };
+      return { ...spread, layoutVariant: nextVariant, frames: createFrames(photoIds, nextVariant, format, frameGapMm) };
     }));
   }
 
@@ -918,7 +1002,7 @@ export default function App() {
       applyPhotoToCover(photoId);
     } else {
       const ids = Array.from(new Set([photoId, ...selectedPhotoIds])).slice(0, 20);
-      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0) } : spread));
+      setSpreads((prev) => prev.map((spread, index) => index === active.index ? { ...spread, frames: createFrames(ids, spread.layoutVariant || 0, format, frameGapMm) } : spread));
     }
   }
 
@@ -973,14 +1057,14 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5-5", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5-6", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5.5",
+      version: "V5.6",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -988,6 +1072,7 @@ export default function App() {
       spineCm,
       texture: texture.label,
       safetyMarginCm: SAFETY_MARGIN_CM,
+      frameGapMm,
       production: {
         output: "JPG limpo",
         dpi: 300,
@@ -1045,8 +1130,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.4</strong>
-            <span>Meia Capa Fotográfica · bleed total + foto inteira + resize/alinhamento</span>
+            <strong>Diagramador Picmimos V5.6</strong>
+            <span>Meia Capa Fotográfica · foto cheia + enquadramento livre + Smart Guides</span>
           </div>
         </div>
         <div className="top-actions">
@@ -1103,6 +1188,14 @@ export default function App() {
             {active.type === "spread" && <Button variant="secondary" onClick={autoBuildCurrentSpread}>Montar automático</Button>}
             {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(-1)}>Layout ‹</Button>}
             {active.type === "spread" && <Button variant="secondary" onClick={() => changeLayout(1)}>Layout ›</Button>}
+            {active.type === "spread" && (
+              <label className="gap-control" title="Distância entre os quadros do layout automático">
+                <span>Espaço</span>
+                <select value={frameGapMm} onChange={(event) => handleFrameGapChange(Number(event.target.value))}>
+                  {[0, 1, 2, 3, 4, 5].map((mm) => <option key={mm} value={mm}>{mm} mm</option>)}
+                </select>
+              </label>
+            )}
             <Button variant={showSafety ? "active" : "secondary"} onClick={() => setShowSafety(!showSafety)}>Corte 3 mm (visual)</Button>
             <Button variant="secondary" onClick={addText}>Texto</Button>
             <Button variant="danger" onClick={clearActive}>Limpar</Button>
@@ -1340,6 +1433,7 @@ function SpreadStage({
       <div className="page-label left">Página esquerda</div>
       <div className="page-label right">Página direita</div>
       <div className="center-fold" />
+      {showSafety && <><div className="page-center-guide left-center" /><div className="page-center-guide right-center" /><div className="page-middle-guide" /></>}
       <GuideLines guides={guides} />
       {showSafety && <div className="safety spread-safe">Área segura 0,3 cm</div>}
       {spread?.frames?.length ? spread.frames.map((frame, index) => {
@@ -1365,13 +1459,18 @@ function SpreadStage({
             onPointerDown={(event) => {
               if (event.target.closest(".frame-transform-handle") || event.target.closest(".frame-move-label")) return;
               onSelectFrame(frame.id, event);
-              if (event.shiftKey) return;
-              onMoveFrame(event, frame);
             }}
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
-            title="Clique e arraste para mover o quadro. Arraste as bolinhas para redimensionar."
+            title="Arraste a foto para enquadrar. Use Mover para mover o quadro e as bolinhas para redimensionar."
           >
-            <div className="frame-crop" onDoubleClick={(event) => { event.stopPropagation(); if (photo) onPhotoPan(event, "frame", frame.id, frame); }}>
+            <div
+              className="frame-crop"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onSelectFrame(frame.id, event);
+                if (!event.shiftKey && photo) onPhotoPan(event, "frame", frame.id, frame);
+              }}
+            >
               <Photo src={photo?.src} frame={frame} />
             </div>
             <span>{index + 1}</span>
@@ -1564,7 +1663,7 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
         <img src={photo.src} alt="" />
       </div>
       <strong>{label}</strong>
-      <p className="hint">Agora a foto entra inteira por padrão. Use zoom apenas se quiser aproximar e os controles Horizontal/Vertical para centralizar exatamente como desejar.</p>
+      <p className="hint">A foto preenche o quadro como no SmartAlbums. Arraste a própria foto no canvas para enquadrar; use zoom e Horizontal/Vertical para ajuste fino.</p>
       <label>Zoom</label>
       <input type="range" min="1" max="3" step="0.01" value={target.cropScale || 1} onChange={(e) => onChange({ cropScale: Number(e.target.value) })} />
       <label>Horizontal</label>
