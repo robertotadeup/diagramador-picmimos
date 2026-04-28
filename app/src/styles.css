@@ -1330,3 +1330,32 @@ select:disabled {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+/* V3.5 - badges de validação do preview 3D lendo configuração */
+.preview3d-config-badges {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  max-width: calc(100% - 36px);
+  pointer-events: none;
+}
+
+.preview3d-config-badges span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.82);
+  color: #111827;
+  border: 1px solid rgba(17,24,39,.10);
+  box-shadow: 0 8px 18px rgba(15,23,42,.12);
+  font-size: 12px;
+  font-weight: 850;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

@@ -1266,7 +1266,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V3.4 Gabarito de Capa",
+      version: "V3.5 Preview 3D Config",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1295,7 +1295,7 @@ export default function App() {
 
   function buildPreview3DPages() {
     const pages = [];
-    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm, coverModel });
+    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm, coverModel, pageCount, coverTemplateSpec });
     spreads.forEach((spread, index) => {
       pages.push({
         id: `preview-spread-${spread.id || index}`,
@@ -1306,6 +1306,8 @@ export default function App() {
         spineCm,
         texture,
         coverModel,
+        pageCount,
+        coverTemplateSpec,
       });
     });
     return pages;
@@ -1372,7 +1374,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V3.4 Gabarito de Capa</strong>
+            <strong>Diagramador Picmimos V3.5 Preview 3D Config</strong>
             <span>Configuração central + gabarito por quantidade de lâminas</span>
           </div>
         </div>
@@ -2055,6 +2057,7 @@ function Preview3D({ pages, photoMap }) {
   const displayedPage = turn ? (pages[turn.from] || page) : page;
   const targetPage = turn ? (pages[turn.to] || null) : null;
   const labelIndex = turn ? turn.to : index;
+  const activeMeta = getPreview3DMeta(pages[labelIndex] || page);
 
   return (
     <div className="preview3d-shell preview3d-v3">
@@ -2087,6 +2090,12 @@ function Preview3D({ pages, photoMap }) {
           <span>{pages[labelIndex]?.title || "Prévia"}</span>
           <strong>{labelIndex + 1} / {Math.max(total, 1)}</strong>
         </div>
+        <div className="preview3d-config-badges" aria-label="Configuração usada no preview 3D">
+          <span>{activeMeta.model}</span>
+          <span>{activeMeta.format}</span>
+          <span>{activeMeta.lombada}</span>
+          <span>{activeMeta.coverType}</span>
+        </div>
       </div>
       <div className="preview3d-dots">
         {pages.map((item, pageIndex) => (
@@ -2104,6 +2113,22 @@ function Preview3D({ pages, photoMap }) {
       </div>
     </div>
   );
+}
+
+function getPreview3DMeta(page) {
+  const coverModel = page?.coverModel || findCoverModel(DEFAULT_COVER_MODEL_ID);
+  const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
+  const spec = page?.coverTemplateSpec;
+  const pageCount = Number(page?.pageCount || spec?.pages || MIN_PAGES);
+  const laminas = spec?.laminas || Math.round(pageCount / 2);
+  const spineMm = spec?.spineMm ?? Math.round((page?.spineCm || getSpineCm(pageCount)) * 10);
+  const isFullArt = coverModel?.cover?.type === "full_photo_cover_art";
+  return {
+    model: coverModel?.shortLabel || coverModel?.label || "Modelo",
+    format: format?.label ? `Formato ${format.label}` : "Formato",
+    lombada: `${laminas} lâminas · lombada ${spineMm} mm`,
+    coverType: isFullArt ? "3D: arte inteira" : "3D: textura + foto frontal",
+  };
 }
 
 function Preview3DEnvironment() {
@@ -2141,18 +2166,41 @@ function getTextureColor(texture) {
   return texture?.previewColor || "#c9b99b";
 }
 
-function getPreviewBookSize(page) {
+function isFullCoverArtPage(page) {
+  return page?.coverModel?.cover?.type === "full_photo_cover_art";
+}
+
+function getPreviewPanelSpec(page) {
   const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
+  const pageCount = Number(page?.pageCount || page?.coverTemplateSpec?.pages || MIN_PAGES);
+  const spineCm = Number(page?.spineCm || getSpineCm(pageCount));
+  const fullW = Math.max(format.closedW * 2 + spineCm, 1);
+  return {
+    format,
+    pageCount,
+    laminas: page?.coverTemplateSpec?.laminas || Math.round(pageCount / 2),
+    spineCm,
+    spineMm: page?.coverTemplateSpec?.spineMm ?? Math.round(spineCm * 10),
+    fullCoverW: fullW,
+    coverH: format.closedH,
+    backRatio: format.closedW / fullW,
+    spineRatio: spineCm / fullW,
+    frontRatio: format.closedW / fullW,
+  };
+}
+
+function getPreviewBookSize(page) {
+  const { format, pageCount, spineCm } = getPreviewPanelSpec(page);
   const coverH = 1.62;
-  const coverW = clamp(coverH * (format.closedW / format.closedH), 1.1, 2.45);
-  const spreadW = clamp(coverH * (format.spreadW / format.spreadH), 2.25, 4.6);
+  const coverW = clamp(coverH * (format.closedW / Math.max(format.closedH, 1)), 1.1, 2.45);
+  const spreadW = clamp(coverH * (format.spreadW / Math.max(format.spreadH, 1)), 2.25, 4.6);
   const spreadH = coverH;
-  const spineCm = page?.spineCm || getSpineCm(MIN_PAGES);
-  const spineW = clamp((spineCm / Math.max(format.closedW, 1)) * coverW, 0.08, 0.36);
-  const pageThickness = clamp(spineW / Math.max(8, MIN_PAGES / 2), 0.012, 0.026);
-  const coverThickness = clamp(pageThickness * 2.25, 0.04, 0.075);
-  const blockThickness = clamp(spineW * 0.78, 0.07, 0.26);
-  return { coverW, coverH, spreadW, spreadH, spineW, pageThickness, coverThickness, blockThickness };
+  const spineW = clamp((spineCm / Math.max(format.closedW, 1)) * coverW, 0.06, 0.46);
+  const laminas = Math.max(1, Math.round(pageCount / 2));
+  const pageThickness = clamp(spineW / Math.max(10, laminas), 0.01, 0.03);
+  const coverThickness = clamp(pageThickness * 2.25, 0.04, 0.078);
+  const blockThickness = clamp(spineW * 0.86, 0.07, 0.34);
+  return { coverW, coverH, spreadW, spreadH, spineW, pageThickness, coverThickness, blockThickness, laminas };
 }
 
 
@@ -2237,8 +2285,9 @@ async function buildSpreadCanvas(page, photoMap) {
 }
 
 async function buildCoverCanvas(page, photoMap) {
-  const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
-  const aspect = Math.max(format.closedW / Math.max(format.closedH, 1), 0.8);
+  const panel = getPreviewPanelSpec(page);
+  const isFullArt = isFullCoverArtPage(page);
+  const aspect = Math.max(panel.format.closedW / Math.max(panel.format.closedH, 1), 0.8);
   const width = 1000;
   const height = Math.round(width / aspect);
   const canvas = document.createElement('canvas');
@@ -2246,21 +2295,87 @@ async function buildCoverCanvas(page, photoMap) {
   canvas.height = height;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = getTextureColor(page?.texture);
-  ctx.fillRect(0, 0, width, height);
-
   const coverPhoto = page?.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
   const image = await loadImageElement(coverPhoto?.src).catch(() => null);
-  if (image) {
-    drawImageCover(ctx, image, 0, 0, width, height, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
+
+  if (isFullArt) {
+    const fullWidth = Math.max(900, Math.round(width / panel.frontRatio));
+    const fullHeight = height;
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = fullWidth;
+    fullCanvas.height = fullHeight;
+    const fullCtx = fullCanvas.getContext('2d');
+    fullCtx.fillStyle = '#f2ede4';
+    fullCtx.fillRect(0, 0, fullWidth, fullHeight);
+    if (image) {
+      drawImageCover(fullCtx, image, 0, 0, fullWidth, fullHeight, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
+    } else {
+      fullCtx.fillStyle = '#d8d2c8';
+      fullCtx.fillRect(0, 0, fullWidth, fullHeight);
+      fullCtx.fillStyle = '#5a5246';
+      fullCtx.font = '700 34px system-ui';
+      fullCtx.textAlign = 'center';
+      fullCtx.fillText('Sem arte completa da capa', fullWidth / 2, fullHeight / 2);
+    }
+    const sx = Math.round((panel.backRatio + panel.spineRatio) * fullWidth);
+    ctx.drawImage(fullCanvas, sx, 0, Math.max(1, panel.frontRatio * fullWidth), fullHeight, 0, 0, width, height);
   } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx.fillRect(width * 0.08, height * 0.08, width * 0.84, height * 0.84);
-    ctx.fillStyle = '#5a5246';
-    ctx.font = '600 32px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('Sem foto na capa', width / 2, height / 2);
+    ctx.fillStyle = getTextureColor(page?.texture);
+    ctx.fillRect(0, 0, width, height);
+    if (image) {
+      drawImageCover(ctx, image, 0, 0, width, height, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(width * 0.08, height * 0.08, width * 0.84, height * 0.84);
+      ctx.fillStyle = '#5a5246';
+      ctx.font = '600 32px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Sem foto na capa', width / 2, height / 2);
+    }
   }
+
+  return canvas;
+}
+
+async function buildSpineCanvas(page, photoMap) {
+  const panel = getPreviewPanelSpec(page);
+  const isFullArt = isFullCoverArtPage(page);
+  const width = 220;
+  const height = 1200;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const coverPhoto = page?.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+  const image = await loadImageElement(coverPhoto?.src).catch(() => null);
+
+  if (isFullArt && image) {
+    const fullWidth = Math.max(1200, Math.round(width / Math.max(panel.spineRatio, 0.03)));
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = fullWidth;
+    fullCanvas.height = height;
+    const fullCtx = fullCanvas.getContext('2d');
+    drawImageCover(fullCtx, image, 0, 0, fullWidth, height, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
+    const sx = Math.round(panel.backRatio * fullWidth);
+    const sw = Math.max(1, Math.round(panel.spineRatio * fullWidth));
+    ctx.drawImage(fullCanvas, sx, 0, sw, height, 0, 0, width, height);
+  } else {
+    ctx.fillStyle = getTextureColor(page?.texture);
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    for (let y = -height; y < height * 2; y += 28) {
+      ctx.fillRect(0, y, width, 5);
+    }
+  }
+
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = '700 72px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(`LOMBADA ${panel.spineMm} MM`, 0, 24);
+  ctx.restore();
 
   return canvas;
 }
@@ -2350,6 +2465,43 @@ function useCoverCanvasTexture(page, photoMap) {
   return texture;
 }
 
+function useSpineCanvasTexture(page, photoMap) {
+  const [texture, setTexture] = useState(null);
+  const depKey = useMemo(() => JSON.stringify({
+    id: page?.id,
+    photoId: page?.cover?.photoId,
+    cropX: page?.cover?.cropX,
+    cropY: page?.cover?.cropY,
+    cropScale: page?.cover?.cropScale,
+    src: page?.cover?.photoId ? photoMap.get(page.cover.photoId)?.src : '',
+    textureId: page?.texture?.id,
+    coverType: page?.coverModel?.cover?.type,
+    spineCm: page?.spineCm,
+    pageCount: page?.pageCount,
+  }), [page, photoMap]);
+
+  useEffect(() => {
+    let alive = true;
+    let previous = null;
+    async function run() {
+      const canvas = await buildSpineCanvas(page, photoMap).catch(() => null);
+      if (!alive || !canvas) return;
+      const nextTexture = textureFromCanvas(canvas);
+      setTexture((old) => {
+        previous = old;
+        return nextTexture;
+      });
+      if (previous) previous.dispose();
+    }
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [depKey, page, photoMap]);
+
+  return texture;
+}
+
 function TexturedPlane({ texture, width, height, z = 0.01 }) {
   return (
     <mesh position={[0, 0, z]}>
@@ -2390,6 +2542,8 @@ function ClosedRigidAlbum3D({ page, photoMap }) {
   const { coverW, coverH, spineW, coverThickness, blockThickness } = getPreviewBookSize(page);
   const coverColor = getTextureColor(page.texture);
   const coverTexture = useCoverCanvasTexture(page, photoMap);
+  const spineTexture = useSpineCanvasTexture(page, photoMap);
+  const isFullArt = isFullCoverArtPage(page);
 
   return (
     <group rotation={[0.04, 0.2, -0.01]}>
@@ -2399,11 +2553,11 @@ function ClosedRigidAlbum3D({ page, photoMap }) {
       </mesh>
       <mesh castShadow receiveShadow position={[-(coverW / 2), 0, 0.012]}>
         <boxGeometry args={[spineW, coverH * 1.02, coverThickness * 1.55]} />
-        <meshStandardMaterial color={coverColor} roughness={0.88} />
+        <meshStandardMaterial map={spineTexture || null} color={spineTexture ? "#ffffff" : coverColor} roughness={isFullArt ? 0.62 : 0.88} toneMapped={false} />
       </mesh>
       <mesh castShadow receiveShadow position={[spineW / 2, 0, 0.035]}>
         <boxGeometry args={[coverW, coverH, coverThickness]} />
-        <meshStandardMaterial color={coverColor} roughness={0.82} />
+        <meshStandardMaterial color={isFullArt ? "#f6f0e5" : coverColor} roughness={isFullArt ? 0.72 : 0.82} />
       </mesh>
       <group position={[spineW / 2, 0, coverThickness / 2 + 0.01]}>
         <TexturedPlane texture={coverTexture} width={coverW * 0.98} height={coverH * 0.98} z={0} />
@@ -2415,6 +2569,7 @@ function ClosedRigidAlbum3D({ page, photoMap }) {
 function OpenRigidAlbum3D({ page, photoMap }) {
   if (!page) return null;
   const { spreadW, spreadH, spineW, pageThickness, blockThickness } = getPreviewBookSize(page);
+  const spineColor = getTextureColor(page.texture);
   return (
     <group rotation={[-0.92, 0.0, 0]} position={[0, -0.16, 0.08]}>
       <mesh castShadow receiveShadow position={[0, 0, -0.11]}>
@@ -2423,7 +2578,7 @@ function OpenRigidAlbum3D({ page, photoMap }) {
       </mesh>
       <mesh castShadow receiveShadow position={[0, 0, -0.02]}>
         <boxGeometry args={[Math.max(spineW, 0.08), spreadH * 1.02, blockThickness * 1.08]} />
-        <meshStandardMaterial color="#cdbda8" roughness={0.96} />
+        <meshStandardMaterial color={spineColor} roughness={0.96} />
       </mesh>
       <RigidSpreadBoard page={page} photoMap={photoMap} width={spreadW} height={spreadH} thickness={pageThickness} z={0.038} />
     </group>
@@ -2526,7 +2681,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         {modal.type === "saved" && (
           <>
             <h2>Projeto salvo</h2>
-            <p>O projeto foi salvo no navegador para teste da V3.4.</p>
+            <p>O projeto foi salvo no navegador para teste da V3.5.</p>
           </>
         )}
         {modal.type === "preview-3d" && (
