@@ -909,14 +909,14 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v5-2", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v5-3", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V5.2",
+      version: "V5.3",
       product: "Meia Capa Fotográfica",
       format: format.label,
       pages: pageCount,
@@ -981,7 +981,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.2</strong>
+            <strong>Diagramador Picmimos V5.3</strong>
             <span>Meia Capa Fotográfica · alinhamento + resize manual + guias</span>
           </div>
         </div>
@@ -1097,6 +1097,7 @@ export default function App() {
       <aside className="right-panel">
         <section className="panel-card">
           <h3>Ajustes</h3>
+          <SelectionHelp count={selectedObjects.length} />
           {selectedObjects.length === 2 && <AlignmentControls objects={selectedObjects} onAlign={alignSelected} />}
           {selectedText ? (
             <TextControls text={selectedText} onChange={updateSelectedText} onRemove={removeSelectedText} />
@@ -1281,11 +1282,12 @@ function SpreadStage({
         const selected = selectedFrameId === frame.id;
         const highlighted = selectedObjects.some((item) => sameObjectRef(item, ref));
         return (
-          <button
-            type="button"
+          <div
             key={frame.id}
             className={`frame ${selected ? "selected" : ""} ${highlighted ? "highlighted" : ""}`}
             style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
+            role="button"
+            tabIndex={0}
             onClick={(event) => onSelectFrame(frame.id, event)}
             onDrop={(event) => {
               event.preventDefault();
@@ -1309,7 +1311,7 @@ function SpreadStage({
                 <button type="button" className="frame-handle resize" onPointerDown={(event) => onResizeFrame(event, frame)} title="Redimensionar quadro">↘</button>
               </>
             )}
-          </button>
+          </div>
         );
       }) : <div className="blank-spread-message">Lâmina em branco. Selecione fotos e clique em “Montar automático”.</div>}
       {spread?.texts?.map((text) => {
@@ -1389,6 +1391,16 @@ function TextBox({ text, scope, selected, highlighted, onSelect, onMove, onResiz
           aria-label="Redimensionar texto"
         />
       ))}
+    </div>
+  );
+}
+
+function SelectionHelp({ count }) {
+  return (
+    <div className="selection-help">
+      <strong>Seleção para alinhar</strong>
+      <span>{count}/2 selecionado(s)</span>
+      <p>Para alinhar: clique em um texto/foto, segure Shift e clique em outro. O último clique vira a referência.</p>
     </div>
   );
 }

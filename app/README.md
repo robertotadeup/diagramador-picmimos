@@ -1,7 +1,7 @@
-# Diagramador Picmimos V5.2
+# Diagramador Picmimos V5.3
 
-Inclui:
-- alinhamento entre 2 elementos com Shift
-- resize manual de quadros de foto
-- guias visuais de alinhamento
-- texto livre com mover e redimensionar
+Correção direta da V5.2:
+- Shift para selecionar 2 elementos
+- Resize manual dos quadros corrigido
+- Guias de alinhamento
+- Mantém a base visual da V5.1
