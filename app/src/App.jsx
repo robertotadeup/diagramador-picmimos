@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V3.8 Preview 3D com Movimento Simples",
+      version: "V3.9 Preview 3D Real MVP",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,7 +1378,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V3.8 Preview 3D com Movimento Simples</strong>
+            <strong>Diagramador Picmimos V3.9 Preview 3D Real MVP</strong>
             <span>Configuração central + gabarito + movimento simples no preview 3D</span>
           </div>
         </div>
@@ -2037,26 +2037,26 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
 
 function Preview3D({ pages, photoMap }) {
   const [index, setIndex] = useState(0);
-  const [motion, setMotion] = useState({ tilt: 58, rotateY: 0, rotateZ: -2, zoom: 1 });
-  const dragRef = useRef(null);
+  const [viewMode, setViewModeState] = useState("cover");
+  const [zoom, setZoom] = useState(1);
   const total = pages.length;
-  const page = pages[index] || null;
-  const activeMeta = getPreview3DMeta(page);
+  const coverPage = pages.find((item) => item?.type === "cover") || pages[0] || null;
+  const firstSpread = pages.find((item) => item?.type === "spread") || pages[0] || null;
+  const page = pages[index] || coverPage || null;
+  const activeMeta = getPreview3DMeta(page || coverPage);
+  const renderMode = page?.type === "spread" ? "open" : viewMode;
+  const renderPage = renderMode === "open" ? (page?.type === "spread" ? page : firstSpread) : (coverPage || page);
 
   useEffect(() => {
     setIndex(0);
+    setViewModeState("cover");
   }, [total]);
-
-  function defaultMotionFor(targetPage = page) {
-    return targetPage?.type === "cover"
-      ? { tilt: 58, rotateY: 0, rotateZ: -2, zoom: 1 }
-      : { tilt: 60, rotateY: 0, rotateZ: -1, zoom: 1 };
-  }
 
   function updateIndex(nextIndex) {
     const safeIndex = clamp(nextIndex, 0, Math.max(total - 1, 0));
     setIndex(safeIndex);
-    setMotion(defaultMotionFor(pages[safeIndex]));
+    const nextPage = pages[safeIndex];
+    setViewModeState(nextPage?.type === "spread" ? "open" : "cover");
   }
 
   function go(direction) {
@@ -2064,66 +2064,22 @@ function Preview3D({ pages, photoMap }) {
   }
 
   function setViewMode(mode) {
-    if (mode === "cover") {
-      updateIndex(0);
-      setMotion({ tilt: 58, rotateY: 0, rotateZ: -2, zoom: 1 });
-      return;
-    }
-
+    setViewModeState(mode);
     if (mode === "open") {
-      const openIndex = total > 1 ? 1 : 0;
-      updateIndex(openIndex);
-      setMotion({ tilt: 60, rotateY: 0, rotateZ: -1, zoom: 1 });
+      const openIndex = Math.max(0, pages.findIndex((item) => item?.type === "spread"));
+      setIndex(openIndex >= 0 ? openIndex : 0);
       return;
     }
-
-    if (mode === "spine") {
-      updateIndex(0);
-      setMotion({ tilt: 58, rotateY: -62, rotateZ: -1, zoom: 1.03 });
-      return;
-    }
-
-    if (mode === "back") {
-      updateIndex(0);
-      setMotion({ tilt: 58, rotateY: 180, rotateZ: 2, zoom: 1 });
-      return;
-    }
+    setIndex(0);
   }
 
   function zoomBy(delta) {
-    setMotion((current) => ({ ...current, zoom: clamp(round((current.zoom || 1) + delta, 2), 0.78, 1.24) }));
+    setZoom((current) => clamp(round((current || 1) + delta, 2), 0.82, 1.22));
   }
 
-  function resetMotion() {
-    setMotion(defaultMotionFor(page));
-  }
-
-  function onPointerDown(event) {
-    if (event.target.closest("button")) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    dragRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      start: motion,
-    };
-  }
-
-  function onPointerMove(event) {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const dx = event.clientX - drag.x;
-    const dy = event.clientY - drag.y;
-    setMotion({
-      ...drag.start,
-      rotateY: clamp(round(drag.start.rotateY + dx * 0.22, 1), -78, 188),
-      tilt: clamp(round(drag.start.tilt - dy * 0.12, 1), 42, 72),
-      rotateZ: clamp(round(drag.start.rotateZ + dx * 0.025, 1), -8, 8),
-    });
-  }
-
-  function onPointerUp(event) {
-    dragRef.current = null;
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  function resetView() {
+    setZoom(1);
+    setViewMode("cover");
   }
 
   useEffect(() => {
@@ -2146,29 +2102,16 @@ function Preview3D({ pages, photoMap }) {
       }
       if (event.key === "0") {
         event.preventDefault();
-        resetMotion();
+        resetView();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [total, index, page, motion]);
-
-  const motionStyle = {
-    "--preview-tilt": `${motion.tilt}deg`,
-    "--preview-rotate-y": `${motion.rotateY}deg`,
-    "--preview-rotate-z": `${motion.rotateZ}deg`,
-    "--preview-zoom": motion.zoom,
-  };
+  }, [total, index, pages]);
 
   return (
-    <div className="preview3d-shell preview3d-stable preview3d-motion">
-      <div
-        className="preview3d-canvas-wrap preview3d-showroom-wrap"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
+    <div className="preview3d-shell preview3d-real">
+      <div className="preview3d-canvas-wrap preview3d-real-wrap">
         <div className="preview3d-config-badges" aria-label="Configuração usada no preview 3D">
           <span>{activeMeta.model}</span>
           <span>{activeMeta.format}</span>
@@ -2176,29 +2119,62 @@ function Preview3D({ pages, photoMap }) {
           <span>{activeMeta.coverType}</span>
         </div>
 
-        <div className="preview3d-motion-controls" aria-label="Controles de visualização 3D">
+        <div className="preview3d-motion-controls preview3d-real-controls" aria-label="Controles de visualização 3D">
           <button type="button" onClick={() => setViewMode("cover")}>Capa</button>
           <button type="button" onClick={() => setViewMode("open")}>Aberto</button>
           <button type="button" onClick={() => setViewMode("spine")}>Lombada</button>
           <button type="button" onClick={() => setViewMode("back")}>Verso</button>
           <button type="button" onClick={() => zoomBy(-0.08)}>-</button>
           <button type="button" onClick={() => zoomBy(0.08)}>+</button>
-          <button type="button" onClick={resetMotion}>Reset</button>
+          <button type="button" onClick={resetView}>Reset</button>
         </div>
 
-        <div className="preview3d-showroom-scene">
-          <div className="preview3d-room-backdrop" />
-          <div className="preview3d-table-ellipse" />
-          {page?.type === "cover" ? (
-            <CoverShowroomPreview page={page} photoMap={photoMap} motionStyle={motionStyle} />
-          ) : (
-            <SpreadShowroomPreview page={page} photoMap={photoMap} motionStyle={motionStyle} />
-          )}
-        </div>
+        <Canvas
+          className="preview3d-real-canvas"
+          shadows
+          dpr={[1, 2]}
+          camera={{ position: [3.7, 2.35, 4.2], fov: 32 }}
+          gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+        >
+          <color attach="background" args={["#f7f8fa"]} />
+          <ambientLight intensity={0.68} />
+          <directionalLight
+            castShadow
+            position={[3.8, 5.4, 4.2]}
+            intensity={1.38}
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
+            shadow-camera-near={0.1}
+            shadow-camera-far={12}
+            shadow-camera-left={-5}
+            shadow-camera-right={5}
+            shadow-camera-top={5}
+            shadow-camera-bottom={-5}
+          />
+          <pointLight position={[-3.6, 2.2, 2.8]} intensity={0.42} />
+          <Preview3DEnvironment />
+          <group scale={[zoom, zoom, zoom]}>
+            <RealAlbum3DMVP page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={renderMode} />
+          </group>
+          <ContactShadows position={[0, -0.012, 0]} opacity={0.34} scale={6.2} blur={2.6} far={3.2} resolution={1024} />
+          <OrbitControls
+            makeDefault
+            enablePan={false}
+            enableZoom={false}
+            enableDamping
+            dampingFactor={0.08}
+            rotateSpeed={0.55}
+            minPolarAngle={0.48}
+            maxPolarAngle={1.28}
+            minAzimuthAngle={-0.96}
+            maxAzimuthAngle={0.96}
+            target={[0, 0.16, 0]}
+          />
+        </Canvas>
 
         <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
         <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={index >= total - 1} aria-label="Folhear para frente">›</button>
-        <div className="preview3d-floating-actions preview3d-floating-actions-stable">
+        <div className="preview3d-floating-actions preview3d-floating-actions-stable preview3d-real-page-label">
           <span>{page?.title || "Prévia"}</span>
           <strong>{index + 1} / {Math.max(total, 1)}</strong>
         </div>
@@ -2214,8 +2190,8 @@ function Preview3D({ pages, photoMap }) {
           />
         ))}
       </div>
-      <p className="preview3d-stable-note">
-        Arraste o álbum com o mouse para inclinar. Use Capa, Aberto, Lombada e Verso para navegar nas vistas. Esta prévia ainda é configurável e preparada para receber regras do plugin WordPress/WooCommerce.
+      <p className="preview3d-stable-note preview3d-real-note">
+        Preview 3D real em Three.js: capa, lombada, bloco de lâminas, materiais, luz e sombra são peças separadas. O plugin WordPress/WooCommerce poderá alimentar estes mesmos parâmetros depois.
       </p>
     </div>
   );
@@ -2416,6 +2392,7 @@ function loadImageElement(src) {
       return;
     }
     const image = new Image();
+    image.crossOrigin = "anonymous";
     image.onload = () => resolve(image);
     image.onerror = reject;
     image.src = src;
@@ -2539,6 +2516,47 @@ async function buildCoverCanvas(page, photoMap) {
     }
   }
 
+  return canvas;
+}
+
+async function buildBackCanvas(page, photoMap) {
+  const panel = getPreviewPanelSpec(page);
+  const isFullArt = isFullCoverArtPage(page);
+  const aspect = Math.max(panel.format.closedW / Math.max(panel.format.closedH, 1), 0.8);
+  const width = 1000;
+  const height = Math.round(width / aspect);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const coverPhoto = page?.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+  const image = await loadImageElement(coverPhoto?.src).catch(() => null);
+
+  if (isFullArt && image) {
+    const fullWidth = Math.max(1200, Math.round(width / Math.max(panel.backRatio, 0.2)));
+    const fullHeight = height;
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = fullWidth;
+    fullCanvas.height = fullHeight;
+    const fullCtx = fullCanvas.getContext('2d');
+    fullCtx.fillStyle = '#f2ede4';
+    fullCtx.fillRect(0, 0, fullWidth, fullHeight);
+    drawImageCover(fullCtx, image, 0, 0, fullWidth, fullHeight, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
+    ctx.drawImage(fullCanvas, 0, 0, Math.max(1, panel.backRatio * fullWidth), fullHeight, 0, 0, width, height);
+  } else {
+    ctx.fillStyle = getTextureColor(page?.texture);
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = '#ffffff';
+    for (let x = -width; x < width * 2; x += 28) {
+      ctx.fillRect(x, 0, 5, height * 1.6);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '700 42px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('VERSO', width / 2, height / 2);
+  }
   return canvas;
 }
 
@@ -2670,6 +2688,41 @@ function useCoverCanvasTexture(page, photoMap) {
   return texture;
 }
 
+function useBackCanvasTexture(page, photoMap) {
+  const [texture, setTexture] = useState(null);
+  const depKey = useMemo(() => JSON.stringify({
+    id: page?.id,
+    photoId: page?.cover?.photoId,
+    cropX: page?.cover?.cropX,
+    cropY: page?.cover?.cropY,
+    cropScale: page?.cover?.cropScale,
+    src: page?.cover?.photoId ? photoMap.get(page.cover.photoId)?.src : '',
+    textureId: page?.texture?.id,
+    coverType: page?.coverModel?.cover?.type,
+  }), [page, photoMap]);
+
+  useEffect(() => {
+    let alive = true;
+    let previous = null;
+    async function run() {
+      const canvas = await buildBackCanvas(page, photoMap).catch(() => null);
+      if (!alive || !canvas) return;
+      const nextTexture = textureFromCanvas(canvas);
+      setTexture((old) => {
+        previous = old;
+        return nextTexture;
+      });
+      if (previous) previous.dispose();
+    }
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [depKey, page, photoMap]);
+
+  return texture;
+}
+
 function useSpineCanvasTexture(page, photoMap) {
   const [texture, setTexture] = useState(null);
   const depKey = useMemo(() => JSON.stringify({
@@ -2713,6 +2766,166 @@ function TexturedPlane({ texture, width, height, z = 0.01 }) {
       <planeGeometry args={[width, height]} />
       <meshStandardMaterial map={texture || null} color={texture ? '#ffffff' : '#e9e2d6'} roughness={0.58} metalness={0.0} toneMapped={false} side={THREE.DoubleSide} />
     </mesh>
+  );
+}
+
+function TopTexturePlane({ texture, width, depth, y = 0.05, opacity = 1, roughness = 0.55 }) {
+  return (
+    <mesh position={[0, y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <planeGeometry args={[width, depth]} />
+      <meshStandardMaterial
+        map={texture || null}
+        color={texture ? '#ffffff' : '#f3efe7'}
+        roughness={roughness}
+        metalness={0.0}
+        transparent={opacity < 1}
+        opacity={opacity}
+        toneMapped={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function AcrylicGlossPlane({ width, depth, y }) {
+  return (
+    <mesh position={[0, y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[width, depth]} />
+      <meshPhysicalMaterial
+        color="#ffffff"
+        transparent
+        opacity={0.18}
+        roughness={0.02}
+        metalness={0.0}
+        clearcoat={1}
+        clearcoatRoughness={0.05}
+        transmission={0.12}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function RealAlbum3DMVP({ page, coverPage, photoMap, mode = "cover" }) {
+  const groupRef = useRef(null);
+  const safePage = page || coverPage;
+  const closedPage = coverPage || page;
+  const isOpen = mode === "open" || safePage?.type === "spread";
+  const preset = getReal3DViewPreset(mode, isOpen);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.55) * 0.006;
+  });
+
+  return (
+    <group ref={groupRef} rotation={preset.rotation} position={preset.position}>
+      {isOpen ? (
+        <OpenAlbumReal3D page={safePage?.type === "spread" ? safePage : page} coverPage={closedPage} photoMap={photoMap} />
+      ) : (
+        <ClosedAlbumReal3D page={closedPage} photoMap={photoMap} mode={mode} />
+      )}
+    </group>
+  );
+}
+
+function getReal3DViewPreset(mode, isOpen) {
+  if (isOpen) return { rotation: [0, -0.18, 0], position: [0, 0, 0] };
+  if (mode === "spine") return { rotation: [0, -1.45, 0], position: [0.06, 0.02, 0] };
+  if (mode === "back") return { rotation: [0, Math.PI - 0.36, 0], position: [0, 0.02, 0] };
+  return { rotation: [0, -0.36, 0], position: [0, 0.02, 0] };
+}
+
+function ClosedAlbumReal3D({ page, photoMap, mode = "cover" }) {
+  if (!page) return null;
+  const { coverW, coverH, spineW, coverThickness, blockThickness } = getPreviewBookSize(page);
+  const totalW = coverW + spineW;
+  const spineX = -totalW / 2 + spineW / 2;
+  const coverX = -totalW / 2 + spineW + coverW / 2;
+  const coverColor = getTextureColor(page.texture);
+  const frontTexture = useCoverCanvasTexture(page, photoMap);
+  const backTexture = useBackCanvasTexture(page, photoMap);
+  const spineTexture = useSpineCanvasTexture(page, photoMap);
+  const isBack = mode === "back";
+  const topTexture = isBack ? backTexture : frontTexture;
+  const effect = page?.preview3DConfig?.frontEffect || "";
+  const hasAcrylic = !isBack && effect.includes("acrylic");
+  const topY = blockThickness + coverThickness;
+
+  return (
+    <group>
+      <mesh castShadow receiveShadow position={[coverX, blockThickness / 2, 0]}>
+        <boxGeometry args={[coverW * 0.985, blockThickness, coverH * 0.985]} />
+        <meshStandardMaterial color="#f1ece3" roughness={0.86} />
+      </mesh>
+
+      <mesh castShadow receiveShadow position={[coverX, blockThickness + coverThickness / 2, 0]}>
+        <boxGeometry args={[coverW, coverThickness, coverH]} />
+        <meshStandardMaterial color={isBack ? coverColor : "#f8f4ec"} roughness={0.72} />
+      </mesh>
+      <group position={[coverX, 0, 0]}>
+        <TopTexturePlane texture={topTexture} width={coverW * 0.985} depth={coverH * 0.985} y={topY + 0.006} roughness={hasAcrylic ? 0.26 : 0.56} />
+        {hasAcrylic && <AcrylicGlossPlane width={coverW * 0.985} depth={coverH * 0.985} y={topY + 0.011} />}
+      </group>
+
+      <mesh castShadow receiveShadow position={[spineX, blockThickness + coverThickness / 2, 0]}>
+        <boxGeometry args={[spineW, coverThickness * 1.18, coverH]} />
+        <meshStandardMaterial color={coverColor} roughness={0.82} />
+      </mesh>
+      <group position={[spineX, 0, 0]}>
+        <TopTexturePlane texture={spineTexture} width={Math.max(spineW * 0.92, 0.018)} depth={coverH * 0.985} y={topY + 0.008} roughness={0.78} />
+      </group>
+
+      <mesh castShadow receiveShadow position={[coverX, coverThickness * 0.24, coverH / 2 + 0.018]}>
+        <boxGeometry args={[coverW * 0.96, coverThickness * 0.42, 0.035]} />
+        <meshStandardMaterial color="#d8d0c3" roughness={0.88} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[coverX, coverThickness * 0.24, -coverH / 2 - 0.018]}>
+        <boxGeometry args={[coverW * 0.96, coverThickness * 0.42, 0.035]} />
+        <meshStandardMaterial color="#d8d0c3" roughness={0.88} />
+      </mesh>
+    </group>
+  );
+}
+
+function OpenAlbumReal3D({ page, coverPage, photoMap }) {
+  const activePage = page?.type === "spread" ? page : null;
+  const referencePage = activePage || coverPage;
+  if (!referencePage) return null;
+  const { spreadW, spreadH, spineW, pageThickness, coverThickness, blockThickness } = getPreviewBookSize(referencePage);
+  const coverColor = getTextureColor(coverPage?.texture || referencePage?.texture);
+  const spreadTexture = useSpreadCanvasTexture(activePage || referencePage, photoMap);
+  const spreadTopY = coverThickness + blockThickness + pageThickness + 0.006;
+
+  return (
+    <group>
+      <mesh castShadow receiveShadow position={[0, coverThickness / 2, 0]} rotation={[0, 0.015, 0]}>
+        <boxGeometry args={[spreadW + spineW * 0.72, coverThickness, spreadH * 1.045]} />
+        <meshStandardMaterial color={coverColor} roughness={0.86} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0, coverThickness + blockThickness / 2, 0]}>
+        <boxGeometry args={[spreadW * 0.985, blockThickness, spreadH * 0.985]} />
+        <meshStandardMaterial color="#eee8dd" roughness={0.92} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0, coverThickness + blockThickness + pageThickness / 2, 0]}>
+        <boxGeometry args={[spreadW, pageThickness, spreadH]} />
+        <meshStandardMaterial color="#fffdf8" roughness={0.52} />
+      </mesh>
+      <TopTexturePlane texture={spreadTexture} width={spreadW * 0.992} depth={spreadH * 0.992} y={spreadTopY} roughness={0.42} />
+
+      <mesh castShadow receiveShadow position={[0, spreadTopY + 0.006, 0]}>
+        <boxGeometry args={[0.014, 0.012, spreadH * 1.006]} />
+        <meshStandardMaterial color="#d7d0c6" roughness={0.76} />
+      </mesh>
+      <mesh receiveShadow position={[-spreadW / 4, spreadTopY + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[spreadW / 2, spreadH]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.5} transparent opacity={0.04} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh receiveShadow position={[spreadW / 4, spreadTopY + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[spreadW / 2, spreadH]} />
+        <meshStandardMaterial color="#000000" roughness={0.5} transparent opacity={0.025} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
 
@@ -2886,7 +3099,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         {modal.type === "saved" && (
           <>
             <h2>Projeto salvo</h2>
-            <p>O projeto foi salvo no navegador para teste da V3.5.</p>
+            <p>O projeto foi salvo no navegador para teste da V3.9.</p>
           </>
         )}
         {modal.type === "preview-3d" && (
