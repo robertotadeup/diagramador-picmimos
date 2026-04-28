@@ -1,30 +1,11 @@
-# Diagramador Picmimos / Proalbuns V6
+# Diagramador Picmimos V5.1 - ajuste de texto
 
-Esta versão foi criada após os testes da V5.
+Esta versão volta para a base visual da V5 e mexe somente na ferramenta de texto.
 
-## O que mudou na V6
+Alterações:
+- Texto selecionado com borda amarela limpa, sem caixa azul/feia.
+- Texto redimensionável direto no diagramador com alças amarelas nos cantos e laterais.
+- Arraste do texto direto pelo canvas.
+- Painel lateral continua com conteúdo, fonte, tamanho, cor, negrito, alinhamento e apagar.
 
-- Texto redimensionável diretamente no canvas com alças.
-- Foto/quadro redimensionável diretamente no canvas com alças.
-- Linha-guia magnética para alinhar bordas e centros.
-- Troca de foto por arraste da biblioteca para qualquer quadro ocupado.
-- Troca de foto entre quadros arrastando pelo botão de troca do próprio quadro.
-- Zoom mínimo bloqueado em 100%, evitando foto menor que o container.
-- Pan/enquadramento da foto continua disponível com arraste no quadro e controles laterais.
-- Botão de centralizar imagem.
-- Validação de capa obrigatória antes de finalizar.
-
-## Como usar no GitHub/EasyPanel
-
-Substitua a pasta `app` do repositório por esta pasta `app`.
-
-Arquivos principais:
-
-- `app/src/App.jsx`
-- `app/src/styles.css`
-- `app/package.json`
-- `app/index.html`
-- `app/Dockerfile`
-- `app/nginx.conf`
-
-Depois aguarde o EasyPanel fazer o deploy e teste em aba anônima.
+Para usar: substitua a pasta `app` no repositório e aguarde o deploy do EasyPanel.

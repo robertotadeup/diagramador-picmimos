@@ -1,1 +1,1 @@
-V6 - resize manual de textos e quadros no canvas, snap magnético, troca de fotos por arraste entre quadros e biblioteca, zoom mínimo bloqueado.
+V5.1 - base V5 preservada. Ajuste inicial somente no texto: seleção limpa, mover e redimensionar direto no canvas com alças amarelas estilo SmartAlbums.
