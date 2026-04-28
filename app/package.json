@@ -1,6 +1,6 @@
 {
-  "name": "diagramador-picmimos-v3-5-preview3d-config",
-  "version": "3.5.0-preview3d-config",
+  "name": "diagramador-picmimos-v3-7-config3d-plugin",
+  "version": "3.7.0-config3d-plugin",
   "private": true,
   "type": "module",
   "scripts": {

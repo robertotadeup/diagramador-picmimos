@@ -1,28 +1,12 @@
-# Diagramador Picmimos / Proalbuns V3.5
+# Diagramador Picmimos V3.7
 
-Versão focada em fazer o preview 3D obedecer a configuração do produto.
+Configuração 3D por produto/plugin.
 
-## O que esta versão mantém
+Principais pontos:
 
-- Editor 2D aprovado.
-- Upload de fotos e fotos demo.
-- Montagem automática.
-- Crop/enquadramento dentro do container.
-- Botão Mover quadro separado do crop.
-- Troca de fotos entre containers.
-- Texto editável.
-- Overlay de fotos usadas.
-- Capa Fotográfica Personalizada com arte inteira.
-- Gabarito de capa por quantidade de lâminas.
-
-## Novo na V3.5
-
-- Preview 3D lê formato, modelo de capa, páginas, lâminas e lombada.
-- Cálculo visual da lombada no 3D segue 1 mm por lâmina.
-- Capa Fotográfica Personalizada usa a arte inteira para representar frente e lombada no 3D.
-- Outros modelos usam textura na lombada/verso e foto somente na frente.
-- Etiquetas de validação aparecem dentro do preview 3D.
-
-## Importante
-
-Esta ainda é uma versão de preparação do 3D. O foco não é deixar o 3D perfeito como Sunpics; o foco é garantir que ele já obedeça as configurações comerciais e técnicas do álbum.
+- O editor continua preservando o fluxo 2D aprovado.
+- A Capa Fotográfica Personalizada continua usando arte completa: verso + lombada + frente.
+- O gabarito continua mudando pela quantidade de lâminas, seguindo 1 mm por lâmina.
+- Foi criada a estrutura `preview3DConfig`, que representa os campos que futuramente serão controlados pelo plugin WordPress/WooCommerce.
+- Cada modelo de capa pode ter uma regra 3D própria: arte inteira, acrílico, suede, madeira, tecido, magnética ou meia capa.
+- O preview 3D continua estável e simples; o foco desta versão é arquitetura configurável, não realismo final.
