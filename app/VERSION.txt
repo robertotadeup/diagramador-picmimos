@@ -1,9 +1,8 @@
-V3.2 CONFIG BASE — Picmimos / Proalbuns
+V3.4 - Gabarito de capa por quantidade de lâminas
 
-- Criado src/config/productConfigs.js como fonte central de configuração.
-- Modelos de capa cadastrados: Fotográfica, Suede, Acrílico, Madeira, Tecido, Magnética e Meia Capa.
-- Formatos corrigidos com medidas abertas Fuji confirmadas.
-- Revestimentos/texturas cadastrados por grupo.
-- Regra de lombada centralizada: 1 mm por lâmina.
-- Painel esquerdo agora lê modelos, formatos, páginas e texturas da configuração.
-- Editor 2D preservado; 3D não foi refinado nesta etapa.
+- Inclui a regra da V3.3: Capa Fotográfica Personalizada usa uma arte única para verso + lombada + frente.
+- Adiciona cálculo automático de lâminas e lombada: 1 mm por lâmina.
+- Adiciona painel de gabarito para Capa Fotográfica Personalizada.
+- Botão "Baixar gabarito" gera um SVG demonstrativo com verso, lombada, frente e margem de segurança.
+- Na versão final, o plugin WordPress/WooCommerce deve fornecer o gabarito PSD/PDF cadastrado pelo administrador do laboratório/encadernadora.
+- Mantém o editor 2D, timeline, crop, texto, troca de fotos e preview 3D sem refazer a estrutura.

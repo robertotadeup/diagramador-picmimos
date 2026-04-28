@@ -1,6 +1,6 @@
 {
-  "name": "diagramador-picmimos-v3-2-config-base",
-  "version": "3.2.0-config-base",
+  "name": "diagramador-picmimos-v3-4-gabarito-capa",
+  "version": "3.4.0-gabarito-capa",
   "private": true,
   "type": "module",
   "scripts": {
