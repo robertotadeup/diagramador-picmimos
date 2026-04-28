@@ -17,6 +17,7 @@ import {
   findFormat,
   findTexture,
   getCoverTemplateSpec,
+  getPreview3DConfig,
   getSpineCm,
   makeCoverTemplateSvg,
   makePageCountOptions,
@@ -486,6 +487,7 @@ export default function App() {
 
   const spineCm = getSpineCm(pageCount);
   const coverTemplateSpec = useMemo(() => getCoverTemplateSpec({ coverModelId, formatId, pageCount }), [coverModelId, formatId, pageCount]);
+  const preview3DConfig = useMemo(() => getPreview3DConfig({ coverModelId, formatId, pageCount, textureId }), [coverModelId, formatId, pageCount, textureId]);
   const isFullCoverArt = coverModel.cover.type === "full_photo_cover_art";
   const coverTotalW = format.closedW * 2 + spineCm;
   const coverAspect = coverTotalW / format.closedH;
@@ -1259,18 +1261,19 @@ export default function App() {
 
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v3-4-gabarito-capa", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v3-7-config3d-plugin", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V3.5 Preview 3D Config",
+      version: "V3.7 Configuração 3D por Produto",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
       coverTemplate: coverTemplateSpec,
+      preview3DConfig,
       format: format.label,
       formatId: format.id,
       pages: pageCount,
@@ -1295,7 +1298,7 @@ export default function App() {
 
   function buildPreview3DPages() {
     const pages = [];
-    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm, coverModel, pageCount, coverTemplateSpec });
+    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm, coverModel, pageCount, coverTemplateSpec, preview3DConfig });
     spreads.forEach((spread, index) => {
       pages.push({
         id: `preview-spread-${spread.id || index}`,
@@ -1308,6 +1311,7 @@ export default function App() {
         coverModel,
         pageCount,
         coverTemplateSpec,
+        preview3DConfig,
       });
     });
     return pages;
@@ -1374,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V3.5 Preview 3D Config</strong>
-            <span>Configuração central + gabarito por quantidade de lâminas</span>
+            <strong>Diagramador Picmimos V3.7 Configuração 3D por Produto</strong>
+            <span>Configuração central + gabarito + regras 3D para futuro plugin</span>
           </div>
         </div>
         <div className="top-actions">
@@ -1422,6 +1426,18 @@ export default function App() {
               <small>Hoje este botão gera um SVG demonstrativo. Na versão final, o plugin WordPress/WooCommerce vai entregar o PSD/PDF cadastrado pelo administrador.</small>
             </div>
           )}
+
+          <div className="template-box preview3d-admin-box">
+            <strong>Configuração 3D</strong>
+            <p>Campo preparado para o futuro plugin WordPress/WooCommerce controlar o visual 3D deste produto.</p>
+            <div className="template-specs">
+              <span>{preview3DConfig.label}</span>
+              <span>{preview3DConfig.coverMode}</span>
+              <span>{preview3DConfig.turnType}</span>
+              <span>{preview3DConfig.environment}</span>
+            </div>
+            <small>Hoje vem do productConfigs.js. Depois virá do cadastro do laboratório no plugin.</small>
+          </div>
 
           <div className="spec-grid">
             <div><span>Modelo</span><strong>{coverModel.shortLabel}</strong></div>
@@ -2021,22 +2037,16 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
 
 function Preview3D({ pages, photoMap }) {
   const [index, setIndex] = useState(0);
-  const [turn, setTurn] = useState(null);
   const total = pages.length;
   const page = pages[index] || null;
-  const canPrev = index > 0 && !turn;
-  const canNext = index < total - 1 && !turn;
+  const activeMeta = getPreview3DMeta(page);
 
   useEffect(() => {
     setIndex(0);
-    setTurn(null);
   }, [total]);
 
   function go(direction) {
-    if (turn) return;
-    const nextIndex = clamp(index + direction, 0, total - 1);
-    if (nextIndex === index) return;
-    setTurn({ from: index, to: nextIndex, direction, id: Date.now() });
+    setIndex((current) => clamp(current + direction, 0, Math.max(total - 1, 0)));
   }
 
   useEffect(() => {
@@ -2052,49 +2062,33 @@ function Preview3D({ pages, photoMap }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [index, total, turn]);
-
-  const displayedPage = turn ? (pages[turn.from] || page) : page;
-  const targetPage = turn ? (pages[turn.to] || null) : null;
-  const labelIndex = turn ? turn.to : index;
-  const activeMeta = getPreview3DMeta(pages[labelIndex] || page);
+  }, [total]);
 
   return (
-    <div className="preview3d-shell preview3d-v3">
-      <div className="preview3d-canvas-wrap">
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 1.35, 4.95], fov: 34 }} gl={{ alpha: true, antialias: true }}>
-          <color attach="background" args={["#edf1f5"]} />
-          <ambientLight intensity={0.62} />
-          <hemisphereLight args={["#fff7ea", "#8aa0b8", 1.1]} />
-          <directionalLight position={[3.6, 5.4, 3.4]} intensity={3.1} castShadow shadow-mapSize={[2048, 2048]} />
-          <directionalLight position={[-3.2, 2.1, 2.7]} intensity={0.72} />
-          <pointLight position={[0.2, 2.2, 2.8]} intensity={0.58} />
-          <Preview3DEnvironment />
-          <RigidAlbum3D
-            page={displayedPage}
-            targetPage={targetPage}
-            turn={turn}
-            photoMap={photoMap}
-            onTurnDone={() => {
-              if (!turn) return;
-              setIndex(turn.to);
-              setTurn(null);
-            }}
-          />
-          <ContactShadows position={[0, -1.11, 0]} opacity={0.42} scale={5.6} blur={2.6} far={3.2} />
-          <OrbitControls enablePan={false} minDistance={3.0} maxDistance={6.2} minPolarAngle={0.72} maxPolarAngle={1.55} />
-        </Canvas>
-        <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={!canPrev} aria-label="Folhear para trás">‹</button>
-        <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={!canNext} aria-label="Folhear para frente">›</button>
-        <div className="preview3d-floating-actions">
-          <span>{pages[labelIndex]?.title || "Prévia"}</span>
-          <strong>{labelIndex + 1} / {Math.max(total, 1)}</strong>
-        </div>
+    <div className="preview3d-shell preview3d-stable">
+      <div className="preview3d-canvas-wrap preview3d-showroom-wrap">
         <div className="preview3d-config-badges" aria-label="Configuração usada no preview 3D">
           <span>{activeMeta.model}</span>
           <span>{activeMeta.format}</span>
           <span>{activeMeta.lombada}</span>
           <span>{activeMeta.coverType}</span>
+        </div>
+
+        <div className="preview3d-showroom-scene">
+          <div className="preview3d-room-backdrop" />
+          <div className="preview3d-table-ellipse" />
+          {page?.type === "cover" ? (
+            <CoverShowroomPreview page={page} photoMap={photoMap} />
+          ) : (
+            <SpreadShowroomPreview page={page} photoMap={photoMap} />
+          )}
+        </div>
+
+        <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
+        <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={index >= total - 1} aria-label="Folhear para frente">›</button>
+        <div className="preview3d-floating-actions preview3d-floating-actions-stable">
+          <span>{page?.title || "Prévia"}</span>
+          <strong>{index + 1} / {Math.max(total, 1)}</strong>
         </div>
       </div>
       <div className="preview3d-dots">
@@ -2102,16 +2096,115 @@ function Preview3D({ pages, photoMap }) {
           <button
             type="button"
             key={item.id || pageIndex}
-            className={`preview3d-dot ${pageIndex === labelIndex ? "on" : ""}`}
-            onClick={() => {
-              if (turn || pageIndex === index) return;
-              setTurn({ from: index, to: pageIndex, direction: pageIndex > index ? 1 : -1, id: Date.now() });
-            }}
+            className={`preview3d-dot ${pageIndex === index ? "on" : ""}`}
+            onClick={() => setIndex(pageIndex)}
             aria-label={`Ir para ${item.title || `prévia ${pageIndex + 1}`}`}
           />
         ))}
       </div>
+      <p className="preview3d-stable-note">
+        Prévia 3D configurável: usa as regras de modelo, formato, lombada, textura e material que futuramente virão do plugin WordPress/WooCommerce.
+      </p>
     </div>
+  );
+}
+
+function CoverShowroomPreview({ page, photoMap }) {
+  const panel = getPreviewPanelSpec(page);
+  const photo = page?.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+  const isFullArt = isFullCoverArtPage(page);
+  const textureColor = getTextureColor(page?.texture);
+  const gridTemplateColumns = `${Math.max(panel.backRatio, 0.2)}fr ${Math.max(panel.spineRatio, 0.035)}fr ${Math.max(panel.frontRatio, 0.2)}fr`;
+
+  return (
+    <div className="preview3d-book preview3d-book-cover" style={{ "--preview-texture": textureColor }}>
+      <div className="preview3d-cover-board" style={{ gridTemplateColumns }}>
+        {isFullArt ? (
+          <>
+            {photo ? <PreviewPhotoImage photo={photo} crop={page.cover} className="preview3d-full-cover-art" /> : <div className="preview3d-empty-art">Arte completa da capa</div>}
+            <div className="preview3d-cover-overlay-grid" style={{ gridTemplateColumns }}>
+              <span>VERSO</span>
+              <span className="spine">LOMBADA<br />{panel.spineMm} mm</span>
+              <span>FRENTE</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="preview3d-cover-part preview3d-cover-back"><span>VERSO</span></div>
+            <div className="preview3d-cover-part preview3d-cover-spine"><span>LOMBADA<br />{panel.spineMm} mm</span></div>
+            <div className="preview3d-cover-part preview3d-cover-front">
+              {photo ? <PreviewPhotoImage photo={photo} crop={page.cover} /> : <div className="preview3d-empty-art">Foto da capa</div>}
+              <span>FRENTE</span>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="preview3d-cover-thickness" />
+      <div className="preview3d-book-shadow" />
+    </div>
+  );
+}
+
+function SpreadShowroomPreview({ page, photoMap }) {
+  const spread = page?.spread;
+  const textureColor = getTextureColor(page?.texture);
+  return (
+    <div className="preview3d-book preview3d-book-open" style={{ "--preview-texture": textureColor }}>
+      <div className="preview3d-open-cover-underlay" />
+      <div className="preview3d-spread-board">
+        <div className="preview3d-spread-page left" />
+        <div className="preview3d-spread-page right" />
+        <div className="preview3d-spread-fold" />
+        {spread?.frames?.map((frame, frameIndex) => {
+          const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
+          return (
+            <div
+              key={frame.id || frameIndex}
+              className="preview3d-spread-frame"
+              style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
+            >
+              {photo ? <PreviewPhotoImage photo={photo} crop={frame} /> : <div className="preview3d-empty-art" />}
+            </div>
+          );
+        })}
+        {spread?.texts?.map((text) => (
+          <div
+            key={text.id}
+            className="preview3d-spread-text"
+            style={{
+              left: `${text.x}%`,
+              top: `${text.y}%`,
+              width: `${text.w || 24}%`,
+              fontSize: `${Math.max(9, (text.size || 24) * 0.42)}px`,
+              fontFamily: text.font || "serif",
+              color: text.color || "#111",
+              fontWeight: text.weight || 700,
+              textAlign: text.align || "center",
+            }}
+          >
+            {text.text}
+          </div>
+        ))}
+      </div>
+      <div className="preview3d-book-shadow" />
+    </div>
+  );
+}
+
+function PreviewPhotoImage({ photo, crop = {}, className = "" }) {
+  const cropX = Number(crop.cropX || 0);
+  const cropY = Number(crop.cropY || 0);
+  const scale = Number(crop.cropScale || 1);
+  return (
+    <img
+      className={className}
+      src={photo.src}
+      alt=""
+      style={{
+        objectPosition: `${clamp(50 + cropX * 0.35, 0, 100)}% ${clamp(50 + cropY * 0.35, 0, 100)}%`,
+        transform: `scale(${scale})`,
+      }}
+    />
   );
 }
 
@@ -2119,15 +2212,15 @@ function getPreview3DMeta(page) {
   const coverModel = page?.coverModel || findCoverModel(DEFAULT_COVER_MODEL_ID);
   const format = page?.format || findFormat(DEFAULT_FORMAT_ID);
   const spec = page?.coverTemplateSpec;
+  const preview3DConfig = page?.preview3DConfig;
   const pageCount = Number(page?.pageCount || spec?.pages || MIN_PAGES);
-  const laminas = spec?.laminas || Math.round(pageCount / 2);
-  const spineMm = spec?.spineMm ?? Math.round((page?.spineCm || getSpineCm(pageCount)) * 10);
-  const isFullArt = coverModel?.cover?.type === "full_photo_cover_art";
+  const laminas = preview3DConfig?.laminas || spec?.laminas || Math.round(pageCount / 2);
+  const spineMm = preview3DConfig?.spineMm ?? spec?.spineMm ?? Math.round((page?.spineCm || getSpineCm(pageCount)) * 10);
   return {
     model: coverModel?.shortLabel || coverModel?.label || "Modelo",
     format: format?.label ? `Formato ${format.label}` : "Formato",
     lombada: `${laminas} lâminas · lombada ${spineMm} mm`,
-    coverType: isFullArt ? "3D: arte inteira" : "3D: textura + foto frontal",
+    coverType: preview3DConfig?.label || "3D configurável",
   };
 }
 
