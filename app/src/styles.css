@@ -532,7 +532,7 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
   overflow: visible !important;
   background: transparent !important;
   box-shadow: none !important;
-  cursor: move;
+  cursor: default;
   z-index: 18;
 }
 
@@ -697,4 +697,30 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 
 .frame-move-label::after {
   content: " quadro";
+}
+
+
+.frame-swap-handle {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  border: 1px dashed rgba(255,255,255,.9);
+  background: rgba(31, 45, 66, .35);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 10px;
+  z-index: 96;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: grab;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.22);
+}
+
+.frame-swap-handle:hover {
+  background: rgba(31, 45, 66, .55);
+}
+
+.frame-swap-handle:active {
+  cursor: grabbing;
 }
