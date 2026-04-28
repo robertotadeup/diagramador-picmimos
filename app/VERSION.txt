@@ -1,6 +1,6 @@
-V3.9 - Preview 3D Real MVP
-- Substitui a simulação CSS do preview por uma cena real em Three.js/React Three Fiber.
-- Usa peças físicas separadas: capa, lombada, bloco de lâminas, spread, materiais, luz e sombra.
-- Mantém gabarito por lâminas, capa fotográfica personalizada como arte inteira e configuração 3D por produto/plugin.
-- Mantém controles de vista: Capa, Aberto, Lombada, Verso, Zoom e Reset.
-- Base criada para que o futuro plugin WordPress/WooCommerce controle os parâmetros de 3D por laboratório.
+V4.0 - Preview 3D GLB leve para web
+- Mantém editor 2D, gabarito por lâminas e configuração do plugin
+- Troca o preview ruim por arquitetura 3D leve, com modelo base e peças de produto mais controladas
+- Preparado para carregar/usar modelo GLB otimizado no futuro plugin WordPress/WooCommerce
+- Preview carrega somente ao clicar em Pré-visualizar
+- Materiais, lombada, câmera, luz, sombra e ambiente continuam vindo de productConfigs.js
