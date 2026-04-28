@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V3.7 Configuração 3D por Produto",
+      version: "V3.8 Preview 3D com Movimento Simples",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V3.7 Configuração 3D por Produto</strong>
-            <span>Configuração central + gabarito + regras 3D para futuro plugin</span>
+            <strong>Diagramador Picmimos V3.8 Preview 3D com Movimento Simples</strong>
+            <span>Configuração central + gabarito + movimento simples no preview 3D</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2037,6 +2037,8 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
 
 function Preview3D({ pages, photoMap }) {
   const [index, setIndex] = useState(0);
+  const [motion, setMotion] = useState({ tilt: 58, rotateY: 0, rotateZ: -2, zoom: 1 });
+  const dragRef = useRef(null);
   const total = pages.length;
   const page = pages[index] || null;
   const activeMeta = getPreview3DMeta(page);
@@ -2045,8 +2047,83 @@ function Preview3D({ pages, photoMap }) {
     setIndex(0);
   }, [total]);
 
+  function defaultMotionFor(targetPage = page) {
+    return targetPage?.type === "cover"
+      ? { tilt: 58, rotateY: 0, rotateZ: -2, zoom: 1 }
+      : { tilt: 60, rotateY: 0, rotateZ: -1, zoom: 1 };
+  }
+
+  function updateIndex(nextIndex) {
+    const safeIndex = clamp(nextIndex, 0, Math.max(total - 1, 0));
+    setIndex(safeIndex);
+    setMotion(defaultMotionFor(pages[safeIndex]));
+  }
+
   function go(direction) {
-    setIndex((current) => clamp(current + direction, 0, Math.max(total - 1, 0)));
+    updateIndex(index + direction);
+  }
+
+  function setViewMode(mode) {
+    if (mode === "cover") {
+      updateIndex(0);
+      setMotion({ tilt: 58, rotateY: 0, rotateZ: -2, zoom: 1 });
+      return;
+    }
+
+    if (mode === "open") {
+      const openIndex = total > 1 ? 1 : 0;
+      updateIndex(openIndex);
+      setMotion({ tilt: 60, rotateY: 0, rotateZ: -1, zoom: 1 });
+      return;
+    }
+
+    if (mode === "spine") {
+      updateIndex(0);
+      setMotion({ tilt: 58, rotateY: -62, rotateZ: -1, zoom: 1.03 });
+      return;
+    }
+
+    if (mode === "back") {
+      updateIndex(0);
+      setMotion({ tilt: 58, rotateY: 180, rotateZ: 2, zoom: 1 });
+      return;
+    }
+  }
+
+  function zoomBy(delta) {
+    setMotion((current) => ({ ...current, zoom: clamp(round((current.zoom || 1) + delta, 2), 0.78, 1.24) }));
+  }
+
+  function resetMotion() {
+    setMotion(defaultMotionFor(page));
+  }
+
+  function onPointerDown(event) {
+    if (event.target.closest("button")) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      start: motion,
+    };
+  }
+
+  function onPointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    setMotion({
+      ...drag.start,
+      rotateY: clamp(round(drag.start.rotateY + dx * 0.22, 1), -78, 188),
+      tilt: clamp(round(drag.start.tilt - dy * 0.12, 1), 42, 72),
+      rotateZ: clamp(round(drag.start.rotateZ + dx * 0.025, 1), -8, 8),
+    });
+  }
+
+  function onPointerUp(event) {
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
 
   useEffect(() => {
@@ -2059,14 +2136,39 @@ function Preview3D({ pages, photoMap }) {
         event.preventDefault();
         go(-1);
       }
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        zoomBy(0.08);
+      }
+      if (event.key === "-") {
+        event.preventDefault();
+        zoomBy(-0.08);
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        resetMotion();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [total]);
+  }, [total, index, page, motion]);
+
+  const motionStyle = {
+    "--preview-tilt": `${motion.tilt}deg`,
+    "--preview-rotate-y": `${motion.rotateY}deg`,
+    "--preview-rotate-z": `${motion.rotateZ}deg`,
+    "--preview-zoom": motion.zoom,
+  };
 
   return (
-    <div className="preview3d-shell preview3d-stable">
-      <div className="preview3d-canvas-wrap preview3d-showroom-wrap">
+    <div className="preview3d-shell preview3d-stable preview3d-motion">
+      <div
+        className="preview3d-canvas-wrap preview3d-showroom-wrap"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         <div className="preview3d-config-badges" aria-label="Configuração usada no preview 3D">
           <span>{activeMeta.model}</span>
           <span>{activeMeta.format}</span>
@@ -2074,13 +2176,23 @@ function Preview3D({ pages, photoMap }) {
           <span>{activeMeta.coverType}</span>
         </div>
 
+        <div className="preview3d-motion-controls" aria-label="Controles de visualização 3D">
+          <button type="button" onClick={() => setViewMode("cover")}>Capa</button>
+          <button type="button" onClick={() => setViewMode("open")}>Aberto</button>
+          <button type="button" onClick={() => setViewMode("spine")}>Lombada</button>
+          <button type="button" onClick={() => setViewMode("back")}>Verso</button>
+          <button type="button" onClick={() => zoomBy(-0.08)}>-</button>
+          <button type="button" onClick={() => zoomBy(0.08)}>+</button>
+          <button type="button" onClick={resetMotion}>Reset</button>
+        </div>
+
         <div className="preview3d-showroom-scene">
           <div className="preview3d-room-backdrop" />
           <div className="preview3d-table-ellipse" />
           {page?.type === "cover" ? (
-            <CoverShowroomPreview page={page} photoMap={photoMap} />
+            <CoverShowroomPreview page={page} photoMap={photoMap} motionStyle={motionStyle} />
           ) : (
-            <SpreadShowroomPreview page={page} photoMap={photoMap} />
+            <SpreadShowroomPreview page={page} photoMap={photoMap} motionStyle={motionStyle} />
           )}
         </div>
 
@@ -2097,19 +2209,19 @@ function Preview3D({ pages, photoMap }) {
             type="button"
             key={item.id || pageIndex}
             className={`preview3d-dot ${pageIndex === index ? "on" : ""}`}
-            onClick={() => setIndex(pageIndex)}
+            onClick={() => updateIndex(pageIndex)}
             aria-label={`Ir para ${item.title || `prévia ${pageIndex + 1}`}`}
           />
         ))}
       </div>
       <p className="preview3d-stable-note">
-        Prévia 3D configurável: usa as regras de modelo, formato, lombada, textura e material que futuramente virão do plugin WordPress/WooCommerce.
+        Arraste o álbum com o mouse para inclinar. Use Capa, Aberto, Lombada e Verso para navegar nas vistas. Esta prévia ainda é configurável e preparada para receber regras do plugin WordPress/WooCommerce.
       </p>
     </div>
   );
 }
 
-function CoverShowroomPreview({ page, photoMap }) {
+function CoverShowroomPreview({ page, photoMap, motionStyle = {} }) {
   const panel = getPreviewPanelSpec(page);
   const photo = page?.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
   const isFullArt = isFullCoverArtPage(page);
@@ -2117,7 +2229,7 @@ function CoverShowroomPreview({ page, photoMap }) {
   const gridTemplateColumns = `${Math.max(panel.backRatio, 0.2)}fr ${Math.max(panel.spineRatio, 0.035)}fr ${Math.max(panel.frontRatio, 0.2)}fr`;
 
   return (
-    <div className="preview3d-book preview3d-book-cover" style={{ "--preview-texture": textureColor }}>
+    <div className="preview3d-book preview3d-book-cover" style={{ "--preview-texture": textureColor, ...motionStyle }}>
       <div className="preview3d-cover-board" style={{ gridTemplateColumns }}>
         {isFullArt ? (
           <>
@@ -2145,11 +2257,11 @@ function CoverShowroomPreview({ page, photoMap }) {
   );
 }
 
-function SpreadShowroomPreview({ page, photoMap }) {
+function SpreadShowroomPreview({ page, photoMap, motionStyle = {} }) {
   const spread = page?.spread;
   const textureColor = getTextureColor(page?.texture);
   return (
-    <div className="preview3d-book preview3d-book-open" style={{ "--preview-texture": textureColor }}>
+    <div className="preview3d-book preview3d-book-open" style={{ "--preview-texture": textureColor, ...motionStyle }}>
       <div className="preview3d-open-cover-underlay" />
       <div className="preview3d-spread-board">
         <div className="preview3d-spread-page left" />
