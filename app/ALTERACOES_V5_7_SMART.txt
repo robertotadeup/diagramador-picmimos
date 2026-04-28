@@ -1,0 +1,27 @@
+Alterações pontuais sobre a V5.7 original:
+
+1. Delete / Backspace
+- Ao selecionar um container/quadro da lâmina e apertar Delete ou Backspace, o container é removido.
+- A foto removida volta automaticamente para a timeline, pois deixa de estar marcada como usada.
+- A lâmina é reorganizada automaticamente com a quantidade restante de fotos.
+
+2. Drag de foto nova para lâmina montada
+- Ao arrastar uma foto da timeline para uma lâmina que já tem fotos, o editor adiciona essa foto ao conjunto atual.
+- Exemplo: se a lâmina tem 2 fotos e o usuário arrasta mais 1, o editor recalcula o layout de 3 fotos.
+- Se a lâmina tem 3 fotos e entra mais 1, recalcula para 4 fotos, e assim por diante.
+
+3. Remoção com reorganização automática
+- Ao apagar uma foto/container de uma lâmina de 3 fotos, o editor recalcula a lâmina para layout de 2 fotos.
+- O mesmo vale para 4 -> 3, 5 -> 4 etc.
+
+4. Timeline
+- A foto removida não é deletada da biblioteca.
+- Ela apenas deixa de estar em uso e volta a aparecer como disponível na timeline.
+- A miniatura da timeline foi ajustada para mostrar a foto inteira, sem crop.
+
+Não foi alterado:
+- Design visual base da V5.7.
+- Nome do app no topo.
+- Package.json.
+- Fluxo de capa.
+- Botões de mover/redimensionar/trocar foto.
