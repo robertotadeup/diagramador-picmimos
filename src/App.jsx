@@ -1045,7 +1045,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.4</strong>
+            <strong>Diagramador Picmimos V5.5</strong>
             <span>Meia Capa Fotográfica · bleed total + foto inteira + resize/alinhamento</span>
           </div>
         </div>
