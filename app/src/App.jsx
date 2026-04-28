@@ -116,49 +116,6 @@ function gapPct(format, gapMm, axis = "x") {
   return round((cm / base) * 100);
 }
 
-function buildFullMosaicLayout(count, gapX = 0.8, gapY = 0.8, variant = 0) {
-  const safeCount = clamp(count, 1, 20);
-  const patterns = {
-    7: [[3, 4], [4, 3], [2, 2, 3]],
-    8: [[4, 4], [3, 2, 3], [2, 3, 3]],
-    9: [[3, 3, 3], [2, 3, 4], [4, 3, 2]],
-    10: [[3, 3, 4], [4, 3, 3], [2, 4, 4]],
-    11: [[4, 4, 3], [3, 4, 4], [4, 3, 4]],
-    12: [[4, 4, 4], [3, 3, 3, 3], [2, 3, 3, 4]],
-    13: [[3, 3, 3, 4], [4, 3, 3, 3], [3, 4, 3, 3]],
-    14: [[4, 4, 3, 3], [3, 4, 4, 3], [4, 3, 3, 4]],
-    15: [[3, 4, 4, 4], [4, 4, 4, 3], [4, 3, 4, 4]],
-    16: [[4, 4, 4, 4], [3, 3, 3, 3, 4], [4, 3, 3, 3, 3]],
-    17: [[4, 4, 3, 3, 3], [3, 4, 4, 3, 3], [3, 3, 4, 4, 3]],
-    18: [[4, 4, 4, 3, 3], [3, 4, 4, 4, 3], [3, 3, 4, 4, 4]],
-    19: [[4, 4, 4, 4, 3], [3, 4, 4, 4, 4], [4, 3, 4, 4, 4]],
-    20: [[4, 4, 4, 4, 4], [3, 4, 3, 3, 3, 4], [4, 3, 3, 3, 4, 3]],
-  };
-
-  const candidates = patterns[safeCount] || [[Math.ceil(safeCount / 2), Math.floor(safeCount / 2)]];
-  const rowCounts = candidates[((variant % candidates.length) + candidates.length) % candidates.length] || candidates[0];
-  const weightFor = (items) => ({ 1: 1.65, 2: 1.35, 3: 1.08, 4: 0.86 }[items] || 0.86);
-  const rowWeights = rowCounts.map(weightFor);
-  const totalGapY = gapY * Math.max(0, rowCounts.length - 1);
-  const usableH = 100 - totalGapY;
-  const totalWeight = rowWeights.reduce((sum, value) => sum + value, 0);
-
-  let y = 0;
-  return rowCounts.flatMap((itemsInRow, rowIndex) => {
-    const rowH = round((usableH * rowWeights[rowIndex]) / totalWeight);
-    const rowY = rowIndex === rowCounts.length - 1 ? round(100 - rowH) : round(y);
-    const cellW = (100 - gapX * (itemsInRow - 1)) / itemsInRow;
-    const boxes = Array.from({ length: itemsInRow }, (_, colIndex) => {
-      const x = round(colIndex * (cellW + gapX));
-      const width = colIndex === itemsInRow - 1 ? round(100 - x) : round(cellW);
-      const height = rowIndex === rowCounts.length - 1 ? round(100 - rowY) : round(rowH);
-      return { x, y: rowY, w: width, h: height };
-    });
-    y += rowH + gapY;
-    return boxes;
-  }).slice(0, safeCount);
-}
-
 function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
   const safeCount = clamp(count, 1, 20);
   const gapX = gapPct(format, gapMm, "x");
@@ -255,13 +212,6 @@ function getLayouts(count, variant = 0, format = FORMATS[3], gapMm = 1) {
       box(0, bottomY, leftBigW, remH),
       ...grid(4, 2, 2, rightX, bottomY, remW, remH),
     ].slice(0, 6));
-  }
-
-  if (safeCount >= 7) {
-    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 0));
-    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 1));
-    layouts.push(buildFullMosaicLayout(safeCount, gapX, gapY, 2));
-    return layouts[((variant % layouts.length) + layouts.length) % layouts.length] || layouts[0];
   }
 
   if (safeCount === 7) {
@@ -430,17 +380,12 @@ function GuideLines({ guides }) {
 
 function Photo({ src, frame }) {
   if (!src) return <div className="empty-photo">Solte uma foto aqui</div>;
-  const posX = clamp(50 + (frame.cropX || 0) * 0.5, 0, 100);
-  const posY = clamp(50 + (frame.cropY || 0) * 0.5, 0, 100);
   return (
     <img
       src={src}
       alt=""
       draggable="false"
-      style={{
-        objectPosition: `${posX}% ${posY}%`,
-        transform: `scale(${frame.cropScale || 1})`,
-      }}
+      style={{ transform: `translate(${frame.cropX || 0}%, ${frame.cropY || 0}%) scale(${frame.cropScale || 1})` }}
     />
   );
 }
@@ -1274,15 +1219,17 @@ export default function App() {
     };
   }
 
-  async function makePreview() {
-    try {
-      const node = stageRef.current;
-      const dataUrl = node ? await htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: "#f6f2eb" }) : null;
-      setModal({ type: "preview", dataUrl });
-    } catch (error) {
-      console.error(error);
-      setModal({ type: "preview", dataUrl: null });
-    }
+  function buildPreviewPages() {
+    const pages = [];
+    pages.push({ id: "preview-cover", type: "cover", title: "Capa", cover, texture, format, spineCm });
+    spreads.forEach((spread, index) => {
+      pages.push({ id: `preview-spread-${spread.id || index}`, type: "spread", title: spread.name || `Página ${index * 2 + 1}-${index * 2 + 2}`, spread });
+    });
+    return pages;
+  }
+
+  function makePreview() {
+    setModal({ type: "preview-flip", pages: buildPreviewPages() });
   }
 
   function finalizeProject() {
@@ -1540,7 +1487,7 @@ export default function App() {
 
       <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={(e) => importFiles(e.target.files)} />
       <input ref={coverFileInputRef} type="file" accept="image/*" hidden onChange={(e) => importCoverFiles(e.target.files)} />
-      {modal && <Modal modal={modal} onClose={() => setModal(null)} onExport={simulatedExport} />}
+      {modal && <Modal modal={modal} onClose={() => setModal(null)} onExport={simulatedExport} photoMap={photoMap} />}
     </div>
   );
 }
@@ -1696,11 +1643,6 @@ function SpreadStage({
             onWheel={(event) => onPhotoWheel(event, "frame", frame)}
             title="Arraste a foto para enquadrar. Use Mover para mover o quadro e as bolinhas para redimensionar."
           >
-            {selected && photo && (
-              <div className="frame-guide" aria-hidden="true">
-                <img src={photo.src} alt="" draggable="false" />
-              </div>
-            )}
             <div
               className="frame-crop"
               onPointerDown={(event) => {
@@ -1925,7 +1867,119 @@ function CropControls({ label, photo, target, onChange, emptyText = "Selecione u
   );
 }
 
-function Modal({ modal, onClose, onExport }) {
+function PreviewBook({ pages, photoMap }) {
+  const [index, setIndex] = useState(0);
+  const total = pages.length;
+  const canPrev = index > 0;
+  const canNext = index < total - 1;
+
+  useEffect(() => {
+    setIndex(0);
+  }, [total]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setIndex((value) => Math.min(total - 1, value + 1));
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setIndex((value) => Math.max(0, value - 1));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [total]);
+
+  const current = pages[index];
+
+  return (
+    <div className="preview-book-shell">
+      <button type="button" className="preview-arrow left" onClick={() => canPrev && setIndex((value) => Math.max(0, value - 1))} disabled={!canPrev} aria-label="Folhear para trás">‹</button>
+      <div className="preview-book-stage">
+        <div className={`preview-book ${current?.type === "cover" ? "is-cover" : "is-spread"}`}>
+          <div className="preview-book-page">
+            {current?.type === "cover" ? (
+              <PreviewCoverPage page={current} photoMap={photoMap} />
+            ) : current?.type === "spread" ? (
+              <PreviewSpreadPage spread={current.spread} photoMap={photoMap} />
+            ) : null}
+          </div>
+        </div>
+        <div className="preview-book-meta">
+          <strong>{current?.title || "Prévia"}</strong>
+          <span>{index + 1} / {Math.max(total, 1)}</span>
+        </div>
+        <div className="preview-book-dots">
+          {pages.map((page, pageIndex) => (
+            <button
+              key={page.id || pageIndex}
+              type="button"
+              className={`preview-dot ${pageIndex === index ? "on" : ""}`}
+              onClick={() => setIndex(pageIndex)}
+              aria-label={`Ir para ${page.title || `página ${pageIndex + 1}`}`}
+            />
+          ))}
+        </div>
+      </div>
+      <button type="button" className="preview-arrow right" onClick={() => canNext && setIndex((value) => Math.min(total - 1, value + 1))} disabled={!canNext} aria-label="Folhear para frente">›</button>
+    </div>
+  );
+}
+
+function PreviewCoverPage({ page, photoMap }) {
+  const photo = page.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+  const frontWidth = (page.format.closedW / (page.format.closedW * 2 + page.spineCm)) * 100;
+  const spineWidth = (page.spineCm / (page.format.closedW * 2 + page.spineCm)) * 100;
+  const backWidth = 100 - frontWidth - spineWidth;
+  const posX = clamp(50 + ((page.cover?.cropX || 0) * 0.5), 0, 100);
+  const posY = clamp(50 + ((page.cover?.cropY || 0) * 0.5), 0, 100);
+  const scale = page.cover?.cropScale || 1;
+  return (
+    <div className="preview-cover-layout">
+      <div className="preview-cover-back" style={{ width: `${backWidth}%`, background: page.texture?.css }} />
+      <div className="preview-cover-spine" style={{ width: `${spineWidth}%`, background: page.texture?.css }} />
+      <div className="preview-cover-front" style={{ width: `${frontWidth}%` }}>
+        {photo ? (
+          <img
+            src={photo.src}
+            alt=""
+            draggable="false"
+            style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }}
+          />
+        ) : <div className="preview-cover-empty">Sem foto na capa</div>}
+      </div>
+    </div>
+  );
+}
+
+function PreviewSpreadPage({ spread, photoMap }) {
+  return (
+    <div className="preview-spread-layout">
+      {(spread?.frames || []).length ? spread.frames.map((frame) => {
+        const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
+        const posX = clamp(50 + ((frame.cropX || 0) * 0.5), 0, 100);
+        const posY = clamp(50 + ((frame.cropY || 0) * 0.5), 0, 100);
+        const scale = frame.cropScale || 1;
+        return (
+          <div key={frame.id} className="preview-frame" style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}>
+            {photo ? (
+              <img
+                src={photo.src}
+                alt=""
+                draggable="false"
+                style={{ objectPosition: `${posX}% ${posY}%`, transform: `scale(${scale})` }}
+              />
+            ) : <div className="preview-empty-photo" />}
+          </div>
+        );
+      }) : <div className="preview-empty-state">Lâmina em branco</div>}
+    </div>
+  );
+}
+
+function Modal({ modal, onClose, onExport, photoMap }) {
   return (
     <div className="modal-backdrop">
       <div className="modal-card">
@@ -1935,11 +1989,11 @@ function Modal({ modal, onClose, onExport }) {
             <p>O projeto foi salvo no navegador para teste da V5.</p>
           </>
         )}
-        {modal.type === "preview" && (
+        {modal.type === "preview-flip" && (
           <>
-            <h2>Pré-visualização</h2>
-            {modal.dataUrl ? <img className="preview-img" src={modal.dataUrl} alt="Prévia" /> : <div className="empty-state">Prévia simulada indisponível neste navegador.</div>}
-            <p>Esta é uma prévia visual. A prévia 3D interativa entra em uma fase posterior.</p>
+            <h2>Pré-visualização interativa</h2>
+            <PreviewBook pages={modal.pages || []} photoMap={photoMap} />
+            <p>Use as setas na tela ou as teclas ← e → do teclado para folhear para frente e para trás.</p>
           </>
         )}
         {modal.type === "finalize" && (
