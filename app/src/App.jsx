@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as htmlToImage from "html-to-image";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, OrbitControls } from "@react-three/drei";
+import { ContactShadows, Environment, PresentationControls, RoundedBox } from "@react-three/drei";
 import {
   COVER_MODELS,
   DEFAULT_COVER_MODEL_ID,
@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V3.9 Preview 3D Real MVP",
+      version: "V4.0 Preview 3D GLB Leve",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V3.9 Preview 3D Real MVP</strong>
-            <span>Configuração central + gabarito + movimento simples no preview 3D</span>
+            <strong>Diagramador Picmimos V4.0 Preview 3D GLB Leve</strong>
+            <span>Configuração central + gabarito + preview 3D leve preparado para GLB</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2110,7 +2110,7 @@ function Preview3D({ pages, photoMap }) {
   }, [total, index, pages]);
 
   return (
-    <div className="preview3d-shell preview3d-real">
+    <div className="preview3d-shell preview3d-real preview3d-v4">
       <div className="preview3d-canvas-wrap preview3d-real-wrap">
         <div className="preview3d-config-badges" aria-label="Configuração usada no preview 3D">
           <span>{activeMeta.model}</span>
@@ -2130,46 +2130,44 @@ function Preview3D({ pages, photoMap }) {
         </div>
 
         <Canvas
-          className="preview3d-real-canvas"
+          className="preview3d-real-canvas preview3d-v4-canvas"
           shadows
-          dpr={[1, 2]}
-          camera={{ position: [3.7, 2.35, 4.2], fov: 32 }}
-          gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
+          dpr={[1, 1.5]}
+          orthographic
+          camera={{ position: [4.2, 3.2, 5.2], zoom: 92, near: 0.1, far: 100 }}
+          gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer: false }}
         >
-          <color attach="background" args={["#f7f8fa"]} />
-          <ambientLight intensity={0.68} />
+          <color attach="background" args={["#f8f9fb"]} />
+          <ambientLight intensity={0.82} />
           <directionalLight
             castShadow
-            position={[3.8, 5.4, 4.2]}
-            intensity={1.38}
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
+            position={[3.2, 5.2, 4.4]}
+            intensity={1.65}
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
             shadow-camera-near={0.1}
-            shadow-camera-far={12}
-            shadow-camera-left={-5}
-            shadow-camera-right={5}
-            shadow-camera-top={5}
-            shadow-camera-bottom={-5}
+            shadow-camera-far={10}
+            shadow-camera-left={-4}
+            shadow-camera-right={4}
+            shadow-camera-top={4}
+            shadow-camera-bottom={-4}
           />
-          <pointLight position={[-3.6, 2.2, 2.8]} intensity={0.42} />
-          <Preview3DEnvironment />
-          <group scale={[zoom, zoom, zoom]}>
-            <RealAlbum3DMVP page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={renderMode} />
-          </group>
-          <ContactShadows position={[0, -0.012, 0]} opacity={0.34} scale={6.2} blur={2.6} far={3.2} resolution={1024} />
-          <OrbitControls
-            makeDefault
-            enablePan={false}
-            enableZoom={false}
-            enableDamping
-            dampingFactor={0.08}
-            rotateSpeed={0.55}
-            minPolarAngle={0.48}
-            maxPolarAngle={1.28}
-            minAzimuthAngle={-0.96}
-            maxAzimuthAngle={0.96}
-            target={[0, 0.16, 0]}
-          />
+          <hemisphereLight args={["#ffffff", "#d7d1c8", 0.75]} />
+          <Environment preset="studio" />
+          <PresentationControls
+            global
+            snap
+            speed={1.25}
+            zoom={1}
+            rotation={[0, 0, 0]}
+            polar={[-0.12, 0.24]}
+            azimuth={[-0.38, 0.38]}
+          >
+            <group scale={[zoom, zoom, zoom]}>
+              <AlbumGLBReadyV4 page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={renderMode} />
+            </group>
+          </PresentationControls>
+          <ContactShadows position={[0, -0.055, 0]} opacity={0.24} scale={5.8} blur={2.25} far={2.2} resolution={512} />
         </Canvas>
 
         <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
@@ -2191,7 +2189,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note preview3d-real-note">
-        Preview 3D real em Three.js: capa, lombada, bloco de lâminas, materiais, luz e sombra são peças separadas. O plugin WordPress/WooCommerce poderá alimentar estes mesmos parâmetros depois.
+        Preview 3D leve preparado para GLB: poucos modelos base, texturas dinâmicas e parâmetros vindos do futuro plugin WordPress/WooCommerce.
       </p>
     </div>
   );
@@ -2803,6 +2801,198 @@ function AcrylicGlossPlane({ width, depth, y }) {
         side={THREE.DoubleSide}
       />
     </mesh>
+  );
+}
+
+
+function AlbumGLBReadyV4({ page, coverPage, photoMap, mode = "cover" }) {
+  const groupRef = useRef(null);
+  const safePage = page || coverPage;
+  const closedPage = coverPage || page;
+  const isOpen = mode === "open" || safePage?.type === "spread";
+  const preset = getV4ViewPreset(mode, isOpen);
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    groupRef.current.position.y = preset.position[1] + Math.sin(state.clock.elapsedTime * 0.55) * 0.004;
+  });
+
+  return (
+    <group ref={groupRef} rotation={preset.rotation} position={preset.position}>
+      <V4StudioBase />
+      {isOpen ? (
+        <OpenAlbumGLBReadyV4 page={safePage?.type === "spread" ? safePage : null} coverPage={closedPage} photoMap={photoMap} />
+      ) : (
+        <ClosedAlbumGLBReadyV4 page={closedPage} photoMap={photoMap} mode={mode} />
+      )}
+    </group>
+  );
+}
+
+function getV4ViewPreset(mode, isOpen) {
+  if (isOpen) return { rotation: [-0.02, -0.16, 0.0], position: [0, 0, 0] };
+  if (mode === "spine") return { rotation: [-0.02, -1.22, 0.02], position: [0.05, 0, 0] };
+  if (mode === "back") return { rotation: [-0.02, Math.PI - 0.34, 0.0], position: [0, 0, 0] };
+  return { rotation: [-0.02, -0.34, 0.0], position: [0, 0, 0] };
+}
+
+function V4StudioBase() {
+  return (
+    <group>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.062, 0]}>
+        <circleGeometry args={[2.35, 96]} />
+        <meshStandardMaterial color="#f0eee9" roughness={0.82} metalness={0} transparent opacity={0.72} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.061, 0]}>
+        <ringGeometry args={[1.02, 1.72, 96]} />
+        <meshBasicMaterial color="#fffaf0" transparent opacity={0.16} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+function V4RoundedBoard({ args, position, color = "#f6f1e8", roughness = 0.68, radius = 0.035, children }) {
+  return (
+    <RoundedBox castShadow receiveShadow args={args} radius={radius} smoothness={8} position={position}>
+      <meshStandardMaterial color={color} roughness={roughness} metalness={0.0} />
+      {children}
+    </RoundedBox>
+  );
+}
+
+function V4TopTexture({ texture, width, depth, y, x = 0, z = 0, roughness = 0.5, opacity = 1 }) {
+  return (
+    <mesh position={[x, y, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <planeGeometry args={[width, depth]} />
+      <meshStandardMaterial
+        map={texture || null}
+        color={texture ? "#ffffff" : "#f7f2e8"}
+        roughness={roughness}
+        metalness={0}
+        transparent={opacity < 1}
+        opacity={opacity}
+        toneMapped={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function V4SideTexture({ texture, width, height, x = 0, y = 0, z = 0, rotation = [0, 0, 0], roughness = 0.65 }) {
+  return (
+    <mesh position={[x, y, z]} rotation={rotation} receiveShadow>
+      <planeGeometry args={[width, height]} />
+      <meshStandardMaterial map={texture || null} color={texture ? "#ffffff" : "#d4c4a7"} roughness={roughness} toneMapped={false} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function V4PageEdgeLines({ width, depth, y, count = 8 }) {
+  const items = Array.from({ length: count });
+  return (
+    <group>
+      {items.map((_, idx) => {
+        const offset = -0.015 - idx * 0.007;
+        return (
+          <mesh key={idx} position={[0, y + offset, depth / 2 + 0.004]}>
+            <boxGeometry args={[width * (0.96 - idx * 0.004), 0.002, 0.004]} />
+            <meshStandardMaterial color={idx % 2 ? "#e8e1d6" : "#f8f4ec"} roughness={0.9} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function V4AcrylicLayer({ width, depth, y, x = 0, z = 0 }) {
+  return (
+    <mesh position={[x, y, z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[width, depth]} />
+      <meshPhysicalMaterial
+        color="#ffffff"
+        transparent
+        opacity={0.20}
+        roughness={0.02}
+        metalness={0}
+        clearcoat={1}
+        clearcoatRoughness={0.025}
+        transmission={0.16}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function ClosedAlbumGLBReadyV4({ page, photoMap, mode = "cover" }) {
+  if (!page) return null;
+  const { coverW, coverH, spineW, coverThickness, blockThickness } = getPreviewBookSize(page);
+  const frontTexture = useCoverCanvasTexture(page, photoMap);
+  const backTexture = useBackCanvasTexture(page, photoMap);
+  const spineTexture = useSpineCanvasTexture(page, photoMap);
+  const coverColor = getTextureColor(page.texture);
+  const isBack = mode === "back";
+  const effect = page?.preview3DConfig?.frontEffect || "";
+  const hasAcrylic = !isBack && effect.includes("acrylic");
+  const boardY = blockThickness + coverThickness / 2;
+  const topY = blockThickness + coverThickness + 0.006;
+  const visibleTexture = isBack ? backTexture : frontTexture;
+
+  return (
+    <group>
+      <V4RoundedBoard args={[coverW * 0.98, blockThickness, coverH * 0.96]} position={[0.06, blockThickness / 2 - 0.012, 0.03]} color="#eee7db" roughness={0.86} radius={0.025} />
+      <V4PageEdgeLines width={coverW * 0.88} depth={coverH * 0.94} y={blockThickness + 0.005} count={9} />
+      <V4RoundedBoard args={[coverW, coverThickness, coverH]} position={[0, boardY, 0]} color={isBack ? coverColor : "#fbf6ee"} roughness={0.68} radius={0.04} />
+      <V4TopTexture texture={visibleTexture} width={coverW * 0.965} depth={coverH * 0.955} y={topY} roughness={hasAcrylic ? 0.22 : 0.48} />
+      {hasAcrylic && <V4AcrylicLayer width={coverW * 0.965} depth={coverH * 0.955} y={topY + 0.006} />}
+      <V4RoundedBoard args={[Math.max(spineW, 0.075), coverThickness * 1.12, coverH]} position={[-coverW / 2 - Math.max(spineW, 0.075) / 2 + 0.006, boardY + 0.002, 0]} color={coverColor} roughness={0.82} radius={0.024} />
+      <V4SideTexture texture={spineTexture} width={coverH * 0.92} height={Math.max(spineW, 0.075)} x={-coverW / 2 - Math.max(spineW, 0.075) - 0.002} y={boardY + 0.008} z={0} rotation={[0, -Math.PI / 2, Math.PI / 2]} roughness={0.78} />
+      <mesh castShadow receiveShadow position={[0.03, 0.012, coverH / 2 + 0.012]}>
+        <boxGeometry args={[coverW * 0.92, 0.024, 0.024]} />
+        <meshStandardMaterial color="#d7cfc2" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+function OpenAlbumGLBReadyV4({ page, coverPage, photoMap }) {
+  const activePage = page?.type === "spread" ? page : null;
+  const referencePage = activePage || coverPage;
+  if (!referencePage) return null;
+  const { spreadW, spreadH, spineW, pageThickness, coverThickness, blockThickness } = getPreviewBookSize(referencePage);
+  const coverColor = getTextureColor(coverPage?.texture || referencePage?.texture);
+  const spreadTexture = useSpreadCanvasTexture(activePage || referencePage, photoMap);
+  const frontTexture = useCoverCanvasTexture(coverPage || referencePage, photoMap);
+  const backTexture = useBackCanvasTexture(coverPage || referencePage, photoMap);
+  const topY = coverThickness + blockThickness + pageThickness + 0.008;
+  const halfW = spreadW / 2;
+
+  return (
+    <group>
+      <group rotation={[0, 0, 0.045]} position={[-halfW / 2 - spineW * 0.15, coverThickness / 2, 0.01]}>
+        <V4RoundedBoard args={[halfW, coverThickness, spreadH * 1.02]} position={[0, 0, 0]} color={coverColor} roughness={0.84} radius={0.035} />
+        <V4TopTexture texture={backTexture} width={halfW * 0.96} depth={spreadH * 0.96} y={coverThickness / 2 + 0.006} roughness={0.72} />
+      </group>
+      <group rotation={[0, 0, -0.035]} position={[halfW / 2 + spineW * 0.15, coverThickness / 2, 0.01]}>
+        <V4RoundedBoard args={[halfW, coverThickness, spreadH * 1.02]} position={[0, 0, 0]} color="#fbf7ef" roughness={0.72} radius={0.035} />
+        <V4TopTexture texture={frontTexture} width={halfW * 0.96} depth={spreadH * 0.96} y={coverThickness / 2 + 0.006} roughness={0.48} />
+      </group>
+      <V4RoundedBoard args={[spreadW * 0.985, blockThickness, spreadH * 0.965]} position={[0, coverThickness + blockThickness / 2, 0]} color="#eee7db" roughness={0.9} radius={0.018} />
+      <V4PageEdgeLines width={spreadW * 0.92} depth={spreadH * 0.94} y={coverThickness + blockThickness + 0.002} count={10} />
+      <V4RoundedBoard args={[spreadW, pageThickness, spreadH]} position={[0, coverThickness + blockThickness + pageThickness / 2, 0]} color="#fffdf8" roughness={0.5} radius={0.018} />
+      <V4TopTexture texture={spreadTexture} width={spreadW * 0.988} depth={spreadH * 0.988} y={topY} roughness={0.38} />
+      <mesh castShadow receiveShadow position={[0, topY + 0.006, 0]}>
+        <boxGeometry args={[0.018, 0.014, spreadH * 1.01]} />
+        <meshStandardMaterial color="#d4ccc0" roughness={0.72} />
+      </mesh>
+      <mesh position={[-halfW / 2, topY + 0.007, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[halfW, spreadH]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.045} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[halfW / 2, topY + 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[halfW, spreadH]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.025} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
 
