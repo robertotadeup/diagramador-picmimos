@@ -724,3 +724,34 @@ select:focus, input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgb
 .frame-swap-handle:active {
   cursor: grabbing;
 }
+
+/* V5.8 - correção cirúrgica do crop sem alterar a interface
+   A foto deixou de ser cortada pelo próprio <img>. Agora ela é uma camada maior,
+   centralizada atrás do frame; o frame-crop é a única máscara final. */
+.photo-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  transform-origin: center center;
+  pointer-events: none;
+  user-select: none;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  background: transparent !important;
+}
+
+.frame-crop,
+.cover-front {
+  overflow: hidden;
+}
+
+/* A biblioteca lateral precisa mostrar a foto inteira. Quem corta é o container, não a miniatura. */
+.photo-tile img {
+  object-fit: contain !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #222;
+}
