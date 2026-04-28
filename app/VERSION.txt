@@ -1,8 +1,14 @@
-V5.7 - enquadramento livre + troca de fotos entre containers
-- Layouts automáticos priorizando containers horizontal, vertical e quadrado
-- Não força orientação do container pela orientação da foto
-- Foto continua preenchendo o container e pode ser arrastada para centralizar
-- Botão transparente “Trocar foto” para arrastar de um quadro para outro
-- Mover quadro continua separado no botão “Mover”
-- Mantidas guias, alinhamento, textos e espaçamento do layout automático
+V5.8 - enquadramento correto por camada de imagem + máscara final
+- Separação real entre FRAME/CONTAINER, IMAGE LAYER e MASK/CROP FINAL
+- Arrastar em cima da foto move somente a imagem dentro do container
+- Botão “Mover” move somente o container inteiro
+- Alças amarelas redimensionam somente o container
+- Botão transparente “Trocar foto” troca a imagem entre containers
+- Miniaturas da lateral aparecem sempre inteiras, sem crop
+- Foto dentro do frame usa escala controlada, centralizada e reposicionável, sem object-fit cover cego
+- Quando o frame está selecionado, aparece uma prévia translúcida da imagem inteira por trás da máscara para o cliente entender o enquadramento
+- Painel lateral mantém Zoom, Horizontal, Vertical e Centralizar
+- Layouts automáticos mantêm containers horizontais, verticais e quadrados
+- Espaçamento automático de 0 mm a 5 mm
+- Guias de dobra, centro da página esquerda, centro da página direita, centro horizontal e alinhamento
 - Build validado com Vite
