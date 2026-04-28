@@ -16,7 +16,9 @@ import {
   findCoverModel,
   findFormat,
   findTexture,
+  getCoverTemplateSpec,
   getSpineCm,
+  makeCoverTemplateSvg,
   makePageCountOptions,
 } from "./config/productConfigs";
 
@@ -483,6 +485,8 @@ export default function App() {
   }, [cover.photoId, spreads]);
 
   const spineCm = getSpineCm(pageCount);
+  const coverTemplateSpec = useMemo(() => getCoverTemplateSpec({ coverModelId, formatId, pageCount }), [coverModelId, formatId, pageCount]);
+  const isFullCoverArt = coverModel.cover.type === "full_photo_cover_art";
   const coverTotalW = format.closedW * 2 + spineCm;
   const coverAspect = coverTotalW / format.closedH;
   const spreadAspect = format.spreadW / format.spreadH;
@@ -1239,19 +1243,34 @@ export default function App() {
     }));
   }
 
+  function downloadCoverTemplate() {
+    if (!coverTemplateSpec?.enabled) return;
+    const svg = makeCoverTemplateSvg(coverTemplateSpec);
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = coverTemplateSpec.fileName || "gabarito-capa.svg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function saveProject() {
     const payload = getProjectPayload();
-    localStorage.setItem("picmimos-diagramador-v3-2-config-base", JSON.stringify(payload));
+    localStorage.setItem("picmimos-diagramador-v3-4-gabarito-capa", JSON.stringify(payload));
     setSavedAt(new Date());
     setModal({ type: "saved" });
   }
 
   function getProjectPayload() {
     return {
-      version: "V3.2 Config Base",
+      version: "V3.4 Gabarito de Capa",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
+      coverTemplate: coverTemplateSpec,
       format: format.label,
       formatId: format.id,
       pages: pageCount,
@@ -1299,7 +1318,7 @@ export default function App() {
   function finalizeProject() {
     const emptySpreads = spreads.map((spread, index) => ({ spread, index })).filter(({ spread }) => !spread.frames.length);
     const problems = [];
-    if (!cover.photoId) problems.push("A capa frontal ainda não tem foto.");
+    if (!cover.photoId) problems.push(isFullCoverArt ? "A arte completa da capa ainda não foi enviada." : "A capa frontal ainda não tem foto.");
     if (emptySpreads.length) problems.push(`${emptySpreads.length} lâmina(s) do miolo estão vazias.`);
     setModal({ type: "finalize", problems, emptySpreads });
   }
@@ -1309,10 +1328,11 @@ export default function App() {
       "00-FICHA-PRODUCAO.html",
       "00-DADOS-PEDIDO.json",
       "00-PREVIEW.jpg",
-      "01-CAPA-FRENTE.jpg",
+      isFullCoverArt ? `01-GABARITO-${coverTemplateSpec.formatId}-${coverTemplateSpec.laminas}-LAMINAS-${coverTemplateSpec.spineMm}MM.svg` : "01-CAPA-FRENTE.jpg",
+      isFullCoverArt ? "02-CAPA-COMPLETA-ARTE-CLIENTE.jpg" : null,
       ...spreads.map((_, index) => `${String(index + 2).padStart(2, "0")}-LAMINA-${String(index + 1).padStart(2, "0")}.jpg`),
     ];
-    setModal({ type: "export", files });
+    setModal({ type: "export", files: files.filter(Boolean) });
   }
 
   const activeLabel = active.type === "cover" ? "Capa" : currentSpread?.name;
@@ -1352,8 +1372,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V3.2 Config Base</strong>
-            <span>Configuração central de modelos, formatos, páginas e revestimentos</span>
+            <strong>Diagramador Picmimos V3.4 Gabarito de Capa</strong>
+            <span>Configuração central + gabarito por quantidade de lâminas</span>
           </div>
         </div>
         <div className="top-actions">
@@ -1382,10 +1402,24 @@ export default function App() {
           </select>
 
           <label>Textura do verso/lombada</label>
-          <select value={textureId} onChange={(e) => setTextureId(e.target.value)}>
+          <select value={textureId} onChange={(e) => setTextureId(e.target.value)} disabled={isFullCoverArt}>
             {TEXTURES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
           <p className="hint">{coverModel.cover.description}</p>
+          {isFullCoverArt && (
+            <div className="template-box">
+              <strong>Gabarito da capa</strong>
+              <p>Baixe o gabarito correto antes de fazer a arte no Photoshop. A lombada muda conforme a quantidade de lâminas.</p>
+              <div className="template-specs">
+                <span>{coverTemplateSpec.formatLabel}</span>
+                <span>{coverTemplateSpec.laminas} lâminas</span>
+                <span>Lombada {coverTemplateSpec.spineMm} mm</span>
+                <span>Arte {coverTemplateSpec.fullCoverWidthCm} x {coverTemplateSpec.fullCoverHeightCm} cm</span>
+              </div>
+              <Button variant="warning" onClick={downloadCoverTemplate}>{coverTemplateSpec.downloadLabel}</Button>
+              <small>Hoje este botão gera um SVG demonstrativo. Na versão final, o plugin WordPress/WooCommerce vai entregar o PSD/PDF cadastrado pelo administrador.</small>
+            </div>
+          )}
 
           <div className="spec-grid">
             <div><span>Modelo</span><strong>{coverModel.shortLabel}</strong></div>
@@ -1412,7 +1446,7 @@ export default function App() {
         <div className="workspace-toolbar">
           <div>
             <strong>{activeLabel}</strong>
-            <span>{active.type === "cover" ? "Frente editável + verso/lombada texturizados" : `${format.spreadW} x ${format.spreadH} cm · Fuji UV Fosco`}</span>
+            <span>{active.type === "cover" ? (isFullCoverArt ? `Arte completa pelo gabarito · ${coverTemplateSpec.laminas} lâminas · lombada ${coverTemplateSpec.spineMm} mm` : "Frente editável + verso/lombada texturizados") : `${format.spreadW} x ${format.spreadH} cm · Fuji UV Fosco`}</span>
           </div>
           <div className="toolbar-actions">
             {active.type === "spread" && <Button variant="secondary" onClick={autoBuildCurrentSpread}>Montar automático</Button>}
@@ -1437,6 +1471,8 @@ export default function App() {
             {active.type === "cover" ? (
               <CoverStage
                 cover={cover}
+                coverModel={coverModel}
+                coverTemplateSpec={coverTemplateSpec}
                 photoMap={photoMap}
                 texture={texture}
                 format={format}
@@ -1490,7 +1526,7 @@ export default function App() {
           {selectedText ? (
             <TextControls text={selectedText} onChange={updateSelectedText} onRemove={removeSelectedText} />
           ) : active.type === "cover" ? (
-            <CropControls label="Foto da capa" photo={currentPhotoForPanel} target={cover} onChange={updateCoverCrop} emptyText="Clique no ícone de upload dentro da capa ou arraste uma foto para a frente." />
+            <CropControls label={isFullCoverArt ? "Arte completa da capa" : "Foto da capa"} photo={currentPhotoForPanel} target={cover} onChange={updateCoverCrop} emptyText={isFullCoverArt ? `Baixe o gabarito ${coverTemplateSpec.laminas} lâminas / lombada ${coverTemplateSpec.spineMm} mm, faça a arte no Photoshop e envie a capa completa aqui.` : "Clique no ícone de upload dentro da capa ou arraste uma foto para a frente."} />
           ) : selectedFrame ? (
             <CropControls label="Foto selecionada" photo={currentPhotoForPanel} target={selectedFrame} onChange={updateFrameCrop} />
           ) : (
@@ -1512,7 +1548,8 @@ export default function App() {
         <section className="panel-card">
           <h3>Status</h3>
           <ul className="status-list">
-            <li><span>Capa com foto</span><strong>{cover.photoId ? "Sim" : "Não"}</strong></li>
+            <li><span>{isFullCoverArt ? "Arte completa" : "Capa com foto"}</span><strong>{cover.photoId ? "Sim" : "Não"}</strong></li>
+            {isFullCoverArt && <li><span>Gabarito</span><strong>{coverTemplateSpec.laminas} lâminas · {coverTemplateSpec.spineMm} mm</strong></li>}
             <li><span>Lâminas vazias</span><strong>{spreads.filter((s) => !s.frames.length).length}</strong></li>
             <li><span>Fotos usadas</span><strong>{usedPhotoIds.size}/{photos.length}</strong></li>
             <li><span>Salvo</span><strong>{savedAt ? savedAt.toLocaleTimeString("pt-BR") : "Ainda não"}</strong></li>
@@ -1566,6 +1603,8 @@ export default function App() {
 
 function CoverStage({
   cover,
+  coverModel,
+  coverTemplateSpec,
   photoMap,
   texture,
   format,
@@ -1586,9 +1625,67 @@ function CoverStage({
 }) {
   const photo = cover.photoId ? photoMap.get(cover.photoId) : null;
   const selectedPhotoId = selectedPhotoIds[0];
+  const isFullCoverArt = coverModel?.cover?.type === "full_photo_cover_art";
   const frontWidth = (format.closedW / (format.closedW * 2 + spineCm)) * 100;
   const spineWidth = (spineCm / (format.closedW * 2 + spineCm)) * 100;
   const backWidth = 100 - frontWidth - spineWidth;
+
+  const sharedDropProps = {
+    onDrop: (event) => {
+      event.preventDefault();
+      const photoId = event.dataTransfer.getData("photo/id");
+      if (photoId) onUseSelected(photoId);
+    },
+    onDragOver: (event) => event.preventDefault(),
+    onPointerDown: (event) => {
+      if (photo) onPhotoPan(event, "cover");
+    },
+    onWheel: (event) => photo && onPhotoWheel(event, "cover"),
+  };
+
+  const renderCoverTexts = () => cover.texts.map((text) => {
+    const ref = makeTextRef("cover", text.id, 0);
+    return (
+      <TextBox
+        key={text.id}
+        text={text}
+        scope="cover"
+        selected={selectedTextId?.scope === "cover" && selectedTextId?.id === text.id}
+        highlighted={selectedObjects.some((item) => sameObjectRef(item, { ...ref }))}
+        onSelect={(event) => onSelectText({ scope: "cover", id: text.id, spreadIndex: 0 }, event)}
+        onMove={(event) => onMoveText(event, text, "cover", 0)}
+        onResize={(event, handle) => onResizeText(event, text, "cover", 0, handle)}
+        onChange={(value) => onChangeText(text.id, { value }, "cover", 0)}
+      />
+    );
+  });
+
+  if (isFullCoverArt) {
+    return (
+      <div className={`cover-layout full-cover-art ${!cover.photoId ? "needs-photo" : ""}`} {...sharedDropProps}>
+        {photo ? <Photo src={photo.src} frame={cover} /> : (
+          <div className="cover-upload-zone">
+            <button type="button" className="cover-upload-button" onClick={onPickCoverPhoto}>
+              <span>＋</span>
+              <strong>Inserir arte completa da capa</strong>
+              <small>Use o gabarito: {coverTemplateSpec?.laminas} lâminas · lombada {coverTemplateSpec?.spineMm} mm</small>
+            </button>
+            {selectedPhotoId && <button type="button" className="cover-selected-button" onClick={() => onUseSelected(selectedPhotoId)}>Usar imagem selecionada</button>}
+          </div>
+        )}
+
+        <div className="full-cover-template-badge">Gabarito: {coverTemplateSpec?.formatLabel} · {coverTemplateSpec?.laminas} lâminas · lombada {coverTemplateSpec?.spineMm} mm</div>
+        <div className="full-cover-guide back" style={{ width: `${backWidth}%` }}>VERSO</div>
+        <div className="full-cover-guide spine" style={{ left: `${backWidth}%`, width: `${spineWidth}%` }}>LOMBADA</div>
+        <div className="full-cover-guide front" style={{ width: `${frontWidth}%` }}>FRENTE</div>
+
+        {photo && <button type="button" className="cover-change-button" onClick={onPickCoverPhoto}>Trocar arte da capa</button>}
+        <GuideLines guides={guides} />
+        {showSafety && <div className="safety cover-safe">Margem de segurança 0,3 cm</div>}
+        {renderCoverTexts()}
+      </div>
+    );
+  }
 
   return (
     <div className="cover-layout">
@@ -1597,16 +1694,7 @@ function CoverStage({
       <div
         className={`cover-front ${!cover.photoId ? "needs-photo" : ""}`}
         style={{ width: `${frontWidth}%` }}
-        onDrop={(event) => {
-          event.preventDefault();
-          const photoId = event.dataTransfer.getData("photo/id");
-          if (photoId) onUseSelected(photoId);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onPointerDown={(event) => {
-          if (photo) onPhotoPan(event, "cover");
-        }}
-        onWheel={(event) => photo && onPhotoWheel(event, "cover")}
+        {...sharedDropProps}
       >
         {photo ? <Photo src={photo.src} frame={cover} /> : (
           <div className="cover-upload-zone">
@@ -1621,22 +1709,7 @@ function CoverStage({
         {photo && <button type="button" className="cover-change-button" onClick={onPickCoverPhoto}>Trocar foto da capa</button>}
         <GuideLines guides={guides} />
         {showSafety && <div className="safety cover-safe">Margem de segurança 0,3 cm</div>}
-        {cover.texts.map((text) => {
-          const ref = makeTextRef("cover", text.id, 0);
-          return (
-            <TextBox
-              key={text.id}
-              text={text}
-              scope="cover"
-              selected={selectedTextId?.scope === "cover" && selectedTextId?.id === text.id}
-              highlighted={selectedObjects.some((item) => sameObjectRef(item, { ...ref }))}
-              onSelect={(event) => onSelectText({ scope: "cover", id: text.id, spreadIndex: 0 }, event)}
-              onMove={(event) => onMoveText(event, text, "cover", 0)}
-              onResize={(event, handle) => onResizeText(event, text, "cover", 0, handle)}
-              onChange={(value) => onChangeText(text.id, { value }, "cover", 0)}
-            />
-          );
-        })}
+        {renderCoverTexts()}
       </div>
     </div>
   );
@@ -2453,7 +2526,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         {modal.type === "saved" && (
           <>
             <h2>Projeto salvo</h2>
-            <p>O projeto foi salvo no navegador para teste da V5.</p>
+            <p>O projeto foi salvo no navegador para teste da V3.4.</p>
           </>
         )}
         {modal.type === "preview-3d" && (
