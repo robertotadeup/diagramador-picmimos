@@ -2156,9 +2156,11 @@ function Preview3D({ pages, photoMap }) {
           <button type="button" className={viewMode === "open" ? "on" : ""} onClick={() => setViewMode("open")}>Aberto</button>
           <button type="button" className={viewMode === "spine" ? "on" : ""} onClick={() => setViewMode("spine")}>Lombada</button>
           <button type="button" className={viewMode === "back" ? "on" : ""} onClick={() => setViewMode("back")}>Verso</button>
+          <button type="button" onClick={() => go(-1)} disabled={index <= 0}>Página anterior</button>
+          <button type="button" onClick={() => go(1)} disabled={index >= total - 1}>Próxima página</button>
+          <button type="button" onClick={() => zoomBy(0.08)}>Zoom +</button>
+          <button type="button" onClick={() => zoomBy(-0.08)}>Zoom -</button>
           <button type="button" onClick={nextAmbient}>Cenário</button>
-          <button type="button" onClick={() => zoomBy(-0.08)}>-</button>
-          <button type="button" onClick={() => zoomBy(0.08)}>+</button>
           <button type="button" onClick={resetView}>Reset</button>
         </div>
 
@@ -2217,7 +2219,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V4.1.1 hotfix: preview híbrido com ambiente visível, mesa/base, capa/páginas do editor e navegação simples. A estrutura continua preparada para o futuro plugin WordPress/WooCommerce controlar cenários, câmera, materiais e gabaritos.
+        V5 preview 3D real estruturado: capa, verso, lombada e miolo com espessura física baseada em lâminas (1 lâmina = 1 mm), usando dados comerciais centralizados e fotos do editor atual.
       </p>
     </div>
   );
@@ -2284,7 +2286,7 @@ function CoverShowroomPreview({ page, photoMap, motionStyle = {} }) {
   const gridTemplateColumns = `${Math.max(panel.backRatio, 0.2)}fr ${Math.max(panel.spineRatio, 0.035)}fr ${Math.max(panel.frontRatio, 0.2)}fr`;
 
   return (
-    <div className="preview3d-book preview3d-book-cover" style={{ "--preview-texture": textureColor, ...motionStyle }}>
+    <div className="preview3d-book preview3d-book-cover preview3d-book-v5" style={{ "--preview-texture": textureColor, ...motionStyle }}>
       <div className="preview3d-cover-board" style={{ gridTemplateColumns }}>
         {isFullArt ? (
           <>
@@ -2306,7 +2308,16 @@ function CoverShowroomPreview({ page, photoMap, motionStyle = {} }) {
           </>
         )}
       </div>
+      <div className="preview3d-cover-depth" aria-hidden="true">
+        <div className="preview3d-cover-depth-back" />
+        <div className="preview3d-cover-depth-spine" style={{ width: `max(${Math.round(panel.spineMm)}px, 12px)` }} />
+        <div className="preview3d-cover-depth-front" />
+      </div>
       <div className="preview3d-cover-thickness" />
+      <div className="preview3d-book-block" aria-hidden="true">
+        <div className="preview3d-book-block-top" />
+        <div className="preview3d-book-block-side" />
+      </div>
       <div className="preview3d-book-shadow" />
     </div>
   );
@@ -2316,12 +2327,19 @@ function SpreadShowroomPreview({ page, photoMap, motionStyle = {} }) {
   const spread = page?.spread;
   const textureColor = getTextureColor(page?.texture);
   return (
-    <div className="preview3d-book preview3d-book-open" style={{ "--preview-texture": textureColor, ...motionStyle }}>
+    <div className="preview3d-book preview3d-book-open preview3d-book-v5" style={{ "--preview-texture": textureColor, ...motionStyle }}>
       <div className="preview3d-open-cover-underlay" />
+      <div className="preview3d-open-block" aria-hidden="true">
+        <div className="preview3d-open-block-edge left" />
+        <div className="preview3d-open-block-edge right" />
+        <div className="preview3d-open-block-spine" />
+      </div>
       <div className="preview3d-spread-board">
         <div className="preview3d-spread-page left" />
         <div className="preview3d-spread-page right" />
         <div className="preview3d-spread-fold" />
+        <div className="preview3d-spread-page-edge left" />
+        <div className="preview3d-spread-page-edge right" />
         {spread?.frames?.map((frame, frameIndex) => {
           const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
           return (
