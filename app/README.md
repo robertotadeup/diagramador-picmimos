@@ -1,4 +1,4 @@
-# Diagramador Picmimos V4.1 Preview 3D Premium com Ambientes
+# Diagramador Picmimos V4.1.1 Hotfix Preview Premium Visível
 
 Versão focada em melhorar o preview 3D sem mexer no editor 2D já funcionando.
 

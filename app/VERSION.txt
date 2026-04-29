@@ -1,3 +1,3 @@
-V4.1 Preview 3D Premium com Ambientes
+V4.1.1 Hotfix Preview Premium Visível
 
 Mudança principal: preview 3D agora usa conceito de ambiente premium, mesa/base, sombra e câmera controlada. Mantém editor 2D, gabaritos e estrutura preparada para plugin WordPress/WooCommerce.
