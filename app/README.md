@@ -1,13 +1,19 @@
-# Diagramador Picmimos V4.0
+# Diagramador Picmimos V4.1 Preview 3D Premium com Ambientes
 
-Preview 3D GLB leve para web.
+Versão focada em melhorar o preview 3D sem mexer no editor 2D já funcionando.
 
-Esta versão preserva o editor 2D e prepara o preview 3D para o caminho definitivo:
+## Principal mudança
 
-- poucos modelos 3D base;
-- parâmetros vindos do plugin WordPress/WooCommerce;
-- texturas aplicadas dinamicamente;
-- carregamento somente ao abrir o preview;
-- materiais, câmera, luz e sombra configuráveis por produto.
+O preview deixa de parecer um objeto solto no vazio e passa a usar:
 
-O objetivo é sair da simulação torta e caminhar para um modelo 3D leve, rápido e profissional.
+- ambiente premium;
+- mesa/base circular;
+- sombra;
+- câmera controlada;
+- troca de cenário;
+- textura dinâmica da capa/páginas;
+- estrutura preparada para futuro plugin WordPress/WooCommerce.
+
+## Instalação
+
+Substitua os arquivos no GitHub e depois faça Deploy/Rebuild no EasyPanel.

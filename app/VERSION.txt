@@ -1,6 +1,3 @@
-V4.0 - Preview 3D GLB leve para web
-- Mantém editor 2D, gabarito por lâminas e configuração do plugin
-- Troca o preview ruim por arquitetura 3D leve, com modelo base e peças de produto mais controladas
-- Preparado para carregar/usar modelo GLB otimizado no futuro plugin WordPress/WooCommerce
-- Preview carrega somente ao clicar em Pré-visualizar
-- Materiais, lombada, câmera, luz, sombra e ambiente continuam vindo de productConfigs.js
+V4.1 Preview 3D Premium com Ambientes
+
+Mudança principal: preview 3D agora usa conceito de ambiente premium, mesa/base, sombra e câmera controlada. Mantém editor 2D, gabaritos e estrutura preparada para plugin WordPress/WooCommerce.
