@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V4.1 Preview 3D Premium com Ambientes",
+      version: "V4.1.1 Hotfix Preview Premium Visível",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,7 +1378,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V4.1 Preview 3D Premium com Ambientes</strong>
+            <strong>Diagramador Picmimos V4.1.1 Hotfix Preview Premium Visível</strong>
             <span>Configuração central + gabarito + preview 3D com ambiente, mesa/base e sombra</span>
           </div>
         </div>
@@ -2042,48 +2042,9 @@ function Preview3D({ pages, photoMap }) {
   const [ambientIndex, setAmbientIndex] = useState(0);
 
   const ambients = useMemo(() => ([
-    {
-      id: "luxury_living",
-      name: "Sala Premium",
-      shortName: "Sala",
-      tableType: "round_glass",
-      background: "radial-gradient(circle at 50% 72%, rgba(255,255,255,.50) 0 13%, rgba(255,255,255,.26) 14% 25%, transparent 45%), linear-gradient(100deg, rgba(33,21,15,.76) 0 12%, transparent 12% 18%, rgba(227,185,111,.35) 19% 23%, transparent 24% 34%, rgba(14,24,31,.72) 35% 43%, rgba(232,243,255,.74) 44% 55%, rgba(24,23,22,.70) 56% 65%, rgba(188,123,51,.38) 66% 74%, rgba(44,31,22,.72) 75% 100%), linear-gradient(180deg, #2b221c 0%, #a77743 54%, #e8dcc8 55%, #c8ac7d 100%)",
-      floor: "linear-gradient(90deg, rgba(255,255,255,.40), rgba(255,255,255,.08), rgba(0,0,0,.08)), radial-gradient(ellipse at center, rgba(255,255,255,.64), rgba(192,162,112,.34) 55%, rgba(98,72,43,.28) 100%)",
-      ambientIntensity: 0.78,
-      mainIntensity: 1.55,
-      keyPosition: [3.6, 5.2, 4.8],
-      tableColor: "#f1eee7",
-      tableOpacity: 0.66,
-      shadowOpacity: 0.35,
-    },
-    {
-      id: "photo_studio",
-      name: "Estúdio Fotográfico",
-      shortName: "Estúdio",
-      tableType: "matte_white",
-      background: "radial-gradient(circle at 18% 45%, rgba(255,255,255,.78), transparent 17%), radial-gradient(circle at 82% 38%, rgba(255,255,255,.70), transparent 18%), linear-gradient(110deg, rgba(236,240,244,.95) 0 22%, rgba(210,216,222,.72) 23% 31%, rgba(252,252,251,.94) 32% 65%, rgba(214,220,226,.74) 66% 76%, rgba(247,248,249,.96) 77% 100%)",
-      floor: "radial-gradient(ellipse at center, rgba(255,255,255,.86), rgba(235,238,240,.48) 55%, rgba(198,205,211,.35) 100%)",
-      ambientIntensity: 0.98,
-      mainIntensity: 1.48,
-      keyPosition: [3.2, 4.6, 4.2],
-      tableColor: "#ffffff",
-      tableOpacity: 0.72,
-      shadowOpacity: 0.28,
-    },
-    {
-      id: "bedroom_clean",
-      name: "Quarto Clean",
-      shortName: "Quarto",
-      tableType: "wood_light",
-      background: "linear-gradient(110deg, rgba(245,238,226,.96) 0 17%, rgba(196,160,112,.35) 18% 24%, rgba(253,249,240,.90) 25% 46%, rgba(210,229,245,.74) 47% 62%, rgba(70,55,43,.45) 63% 70%, rgba(244,231,211,.95) 71% 100%), radial-gradient(circle at 22% 72%, rgba(151,105,61,.34), transparent 26%), radial-gradient(circle at 76% 68%, rgba(255,255,255,.48), transparent 30%)",
-      floor: "linear-gradient(105deg, rgba(218,185,140,.60), rgba(255,244,226,.42), rgba(169,127,76,.33))",
-      ambientIntensity: 0.90,
-      mainIntensity: 1.35,
-      keyPosition: [2.8, 4.7, 4.8],
-      tableColor: "#ead7bd",
-      tableOpacity: 0.62,
-      shadowOpacity: 0.32,
-    },
+    { id: "luxury_living", name: "Sala Premium", shortName: "Sala", table: "Mesa de vidro" },
+    { id: "photo_studio", name: "Estúdio Fotográfico", shortName: "Estúdio", table: "Base estúdio" },
+    { id: "bedroom_clean", name: "Quarto Clean", shortName: "Quarto", table: "Mesa clara" },
   ]), []);
 
   const total = pages.length;
@@ -2092,8 +2053,13 @@ function Preview3D({ pages, photoMap }) {
   const page = pages[index] || coverPage || null;
   const activeMeta = getPreview3DMeta(page || coverPage);
   const ambient = ambients[ambientIndex] || ambients[0];
-  const renderMode = page?.type === "spread" ? "open" : viewMode;
-  const renderPage = renderMode === "open" ? (page?.type === "spread" ? page : firstSpread) : (coverPage || page);
+  const hasCoverPhoto = Boolean(coverPage?.cover?.photoId && photoMap.get(coverPage.cover.photoId));
+  const renderPage = viewMode === "open" ? (page?.type === "spread" ? page : firstSpread) : (coverPage || page);
+  const bookClass = [
+    "premium-scene-book",
+    `view-${viewMode}`,
+    hasCoverPhoto ? "has-cover-photo" : "missing-cover-photo",
+  ].join(" ");
 
   useEffect(() => {
     setIndex(0);
@@ -2122,7 +2088,7 @@ function Preview3D({ pages, photoMap }) {
   }
 
   function zoomBy(delta) {
-    setZoom((current) => clamp(round((current || 1) + delta, 2), 0.82, 1.36));
+    setZoom((current) => clamp(round((current || 1) + delta, 2), 0.86, 1.34));
   }
 
   function resetView() {
@@ -2166,75 +2132,64 @@ function Preview3D({ pages, photoMap }) {
   }, [total, index, pages, ambients.length]);
 
   return (
-    <div
-      className="preview3d-shell preview3d-real preview3d-v4 preview3d-premium"
-      style={{
-        "--ambient-background": ambient.background,
-        "--ambient-floor": ambient.floor,
-      }}
-    >
-      <div className="preview3d-canvas-wrap preview3d-real-wrap preview3d-premium-wrap" data-ambient={ambient.id}>
-        <div className="preview3d-premium-backdrop" aria-hidden="true" />
-        <div className="preview3d-premium-floor" aria-hidden="true" />
+    <div className="preview3d-shell premium-scene-shell">
+      <div className={`premium-scene-wrap ambient-${ambient.id}`}>
+        <div className="premium-scene-background" aria-hidden="true">
+          <div className="room-wall wall-left" />
+          <div className="room-wall wall-right" />
+          <div className="room-window" />
+          <div className="room-sofa" />
+          <div className="room-lamp lamp-left" />
+          <div className="room-lamp lamp-right" />
+        </div>
 
-        <div className="preview3d-config-badges" aria-label="Configuração usada no preview 3D">
+        <div className="preview3d-config-badges premium-scene-badges" aria-label="Configuração usada no preview 3D">
           <span>{activeMeta.model}</span>
           <span>{activeMeta.format}</span>
           <span>{activeMeta.lombada}</span>
           <span>{activeMeta.coverType}</span>
-          <span>Ambiente: {ambient.shortName}</span>
+          <span>{ambient.shortName}</span>
         </div>
 
-        <div className="preview3d-motion-controls preview3d-real-controls preview3d-premium-controls" aria-label="Controles de visualização 3D">
-          <button type="button" onClick={() => setViewMode("cover")}>Capa</button>
-          <button type="button" onClick={() => setViewMode("open")}>Aberto</button>
-          <button type="button" onClick={() => setViewMode("spine")}>Lombada</button>
-          <button type="button" onClick={() => setViewMode("back")}>Verso</button>
+        <div className="preview3d-motion-controls premium-scene-controls" aria-label="Controles de visualização 3D">
+          <button type="button" className={viewMode === "cover" ? "on" : ""} onClick={() => setViewMode("cover")}>Capa</button>
+          <button type="button" className={viewMode === "open" ? "on" : ""} onClick={() => setViewMode("open")}>Aberto</button>
+          <button type="button" className={viewMode === "spine" ? "on" : ""} onClick={() => setViewMode("spine")}>Lombada</button>
+          <button type="button" className={viewMode === "back" ? "on" : ""} onClick={() => setViewMode("back")}>Verso</button>
           <button type="button" onClick={nextAmbient}>Cenário</button>
           <button type="button" onClick={() => zoomBy(-0.08)}>-</button>
           <button type="button" onClick={() => zoomBy(0.08)}>+</button>
           <button type="button" onClick={resetView}>Reset</button>
         </div>
 
-        <Canvas
-          className="preview3d-real-canvas preview3d-v4-canvas preview3d-premium-canvas"
-          shadows
-          dpr={[1, 1.45]}
-          orthographic
-          camera={{ position: [4.4, 3.4, 5.2], zoom: 112, near: 0.1, far: 100 }}
-          gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer: false }}
-          onCreated={({ gl }) => {
-            gl.setClearColor(0x000000, 0);
-          }}
-        >
-          <Preview3DLighting ambient={ambient} />
-          <Environment preset="apartment" />
-          <PremiumPreviewTable ambient={ambient} />
-          <PresentationControls
-            global
-            snap
-            speed={1.1}
-            zoom={1}
-            rotation={[0, 0, 0]}
-            polar={[-0.08, 0.18]}
-            azimuth={[-0.30, 0.30]}
-          >
-            <group scale={[zoom * 1.16, zoom * 1.16, zoom * 1.16]} position={[0, 0.18, 0]}>
-              <AlbumGLBReadyV4 page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={renderMode} />
-            </group>
-          </PresentationControls>
-          <ContactShadows position={[0, 0.018, 0]} opacity={ambient.shadowOpacity || 0.32} scale={4.4} blur={1.7} far={2.4} resolution={512} />
-        </Canvas>
+        <div className="premium-scene-stage">
+          <div className="premium-scene-table" aria-hidden="true">
+            <div className="table-highlight" />
+            <div className="table-shadow" />
+          </div>
+          <div className={bookClass} style={{ "--scene-zoom": zoom }}>
+            {viewMode === "open" ? (
+              <SpreadShowroomPreview page={renderPage} photoMap={photoMap} />
+            ) : (
+              <CoverShowroomPreview page={coverPage || renderPage} photoMap={photoMap} />
+            )}
+          </div>
+          {!hasCoverPhoto && viewMode !== "open" && (
+            <div className="premium-scene-warning">
+              A capa ainda não tem foto/arte aplicada. Arraste uma foto para a capa no editor 2D.
+            </div>
+          )}
+        </div>
 
         <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
         <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={index >= total - 1} aria-label="Folhear para frente">›</button>
 
-        <div className="preview3d-floating-actions preview3d-floating-actions-stable preview3d-real-page-label">
+        <div className="preview3d-floating-actions premium-scene-page-label">
           <span>{page?.title || "Prévia"}</span>
           <strong>{index + 1} / {Math.max(total, 1)}</strong>
         </div>
 
-        <div className="preview3d-ambient-switcher" aria-label="Trocar cenário do preview 3D">
+        <div className="preview3d-ambient-switcher premium-scene-ambient-switcher" aria-label="Trocar cenário do preview 3D">
           {ambients.map((item, itemIndex) => (
             <button
               type="button"
@@ -2261,8 +2216,8 @@ function Preview3D({ pages, photoMap }) {
           />
         ))}
       </div>
-      <p className="preview3d-stable-note preview3d-real-note preview3d-premium-note">
-        Preview 3D premium com ambiente, mesa/base e sombra. A estrutura já está preparada para o futuro plugin WordPress/WooCommerce cadastrar cenários, câmera, luz, materiais e gabaritos por produto.
+      <p className="preview3d-stable-note premium-scene-note">
+        V4.1.1 hotfix: preview híbrido com ambiente visível, mesa/base, capa/páginas do editor e navegação simples. A estrutura continua preparada para o futuro plugin WordPress/WooCommerce controlar cenários, câmera, materiais e gabaritos.
       </p>
     </div>
   );
