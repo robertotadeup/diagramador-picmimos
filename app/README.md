@@ -1,18 +1,17 @@
-# Diagramador Picmimos V4.1.1 Hotfix Preview Premium Visível
+# Diagramador Picmimos V5 Preview 3D Real Estruturado
 
-Versão focada em melhorar o preview 3D sem mexer no editor 2D já funcionando.
+Versão focada em consolidar o preview 3D como produto físico real sem mexer no editor 2D já funcionando.
 
-## Principal mudança
+## Principais mudanças
 
-O preview deixa de parecer um objeto solto no vazio e passa a usar:
+A V5 mantém a base 3D existente e organiza o preview com foco em produto real:
 
-- ambiente premium;
-- mesa/base circular;
-- sombra;
-- câmera controlada;
-- troca de cenário;
-- textura dinâmica da capa/páginas;
-- estrutura preparada para futuro plugin WordPress/WooCommerce.
+- modos de visualização Capa, Aberto, Lombada e Verso;
+- controles explícitos de Página anterior/Próxima página e Zoom +/Zoom -;
+- visual de capa frontal, capa traseira, lombada e bloco/miolo;
+- regra de lombada respeitada (1 lâmina = 1 mm);
+- arte completa para capa fotográfica personalizada e textura de material para demais modelos;
+- manutenção integral do editor 2D, layouts e validações atuais.
 
 ## Instalação
 
