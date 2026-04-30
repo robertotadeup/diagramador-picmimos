@@ -1,20 +1,20 @@
-# Diagramador Picmimos V5.3 Restore Real 3D Preview
+# Diagramador Picmimos V5.4 Preview 3D Premium Organizado
 
-Versão focada em restaurar o preview/modal 3D real, com álbum centralizado, câmera útil e cenário físico simples.
+Versão focada em organizar somente o preview/modal 3D, mantendo o editor 2D intacto.
 
 ## Objetivo
 
-Recuperar a experiência 3D real da V5.1, mantendo a interface limpa da V5.2 e sem afetar editor 2D, upload, layouts, crop ou texto.
+Corrigir a bagunça visual da V5.3 no modal 3D: separar informações, controles, Canvas e navegação; deixar o álbum físico mais centralizado; reduzir o destaque do palco/floor; e atualizar todos os textos internos para V5.4.
 
-## Escopo da V5.3
+## Escopo da V5.4
 
-- Fundo premium claro e contínuo.
-- Produto maior, mais centralizado e com menos inclinação.
-- Controles discretos fora da área principal do álbum.
-- Informações do produto em faixa discreta.
-- Navegação inferior mais leve.
-- Placeholder elegante quando a capa ainda não tem foto.
-- Sem alteração no editor 2D, upload, layouts, crop, textos ou validações.
+- Preview 3D com Canvas/Three.js mantido.
+- Faixa de informações do produto fora da área principal do álbum.
+- Controles Capa, Aberto, Lombada, Verso, Zoom +, Zoom - e Reset fora do Canvas.
+- Palco mais limpo e menos chamativo.
+- Álbum mais centralizado, com sombra e luz mais suaves.
+- Navegação de ambiente e páginas mais discreta.
+- Sem alteração no editor 2D, upload, layouts, crop, textos, validações, productConfigs, package.json ou package-lock.
 
 ## Arquivos alterados
 
@@ -25,21 +25,6 @@ Recuperar a experiência 3D real da V5.1, mantendo a interface limpa da V5.2 e s
 
 ---
 
-# Diagramador Picmimos V5.1 Preview Premium
+# Histórico anterior
 
-Versão focada em refinar somente o preview/modal 3D com visual premium limpo, sem mexer no editor 2D.
-
-## Principais mudanças
-
-A V5 mantém a base 3D existente e organiza o preview com foco em produto real:
-
-- modos de visualização Capa, Aberto, Lombada e Verso;
-- controles explícitos de Página anterior/Próxima página e Zoom +/Zoom -;
-- visual de capa frontal, capa traseira, lombada e bloco/miolo;
-- regra de lombada respeitada (1 lâmina = 1 mm);
-- arte completa para capa fotográfica personalizada e textura de material para demais modelos;
-- manutenção integral do editor 2D, layouts e validações atuais.
-
-## Instalação
-
-Substitua os arquivos no GitHub e depois faça Deploy/Rebuild no EasyPanel.
+A V5.3 restaurou o preview 3D real depois da V5.2, mas ainda deixou textos visíveis como V5.2 e manteve controles sobre a cena. A V5.4 organiza essa camada sem mexer na base do editor.
