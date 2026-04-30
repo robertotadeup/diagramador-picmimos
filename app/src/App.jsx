@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V5.1 Preview Premium",
+      version: "V5.2 Preview Premium Clean",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.1 Preview Premium</strong>
-            <span>Preview/modal 3D refinado com visual limpo de álbum físico</span>
+            <strong>Diagramador Picmimos V5.2 Preview Premium Clean</strong>
+            <span>Preview/modal 3D premium clean com palco limpo de álbum físico</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2218,7 +2218,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V5.1 preview premium: visual limpo de álbum físico com capa, verso, lombada e miolo.
+        V5.2 preview premium clean: prévia limpa de álbum físico com capa, verso, lombada e miolo.
       </p>
     </div>
   );
@@ -3391,7 +3391,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         )}
         {modal.type === "preview-3d" && (
           <>
-            <h2>Pré-visualização 3D V5.1</h2>
+            <h2>Pré-visualização 3D V5.2</h2>
             <Preview3D pages={modal.pages || []} photoMap={photoMap} />
             <p>Use as setas na tela ou as teclas ← e → para folhear. As lâminas viram como placas rígidas de álbum 800g. Use o mouse para girar, aproximar e afastar.</p>
           </>
