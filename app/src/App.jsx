@@ -2042,9 +2042,45 @@ function Preview3D({ pages, photoMap }) {
   const [ambientIndex, setAmbientIndex] = useState(0);
 
   const ambients = useMemo(() => ([
-    { id: "luxury_living", name: "Sala Premium", shortName: "Sala", table: "Mesa de vidro" },
-    { id: "photo_studio", name: "Estúdio Fotográfico", shortName: "Estúdio", table: "Base estúdio" },
-    { id: "bedroom_clean", name: "Quarto Clean", shortName: "Quarto", table: "Mesa clara" },
+    {
+      id: "luxury_living",
+      name: "Sala Premium",
+      shortName: "Sala",
+      table: "Mesa de vidro",
+      background: "radial-gradient(circle at 30% 24%, #f9f5ea 0%, #d9c8ab 48%, #c2b09a 100%)",
+      floor: "#ede3d5",
+      ambientIntensity: 0.95,
+      mainIntensity: 1.35,
+      keyPosition: [2.8, 5.2, 3.8],
+      tableColor: "#f5eee6",
+      tableOpacity: 0.72,
+    },
+    {
+      id: "photo_studio",
+      name: "Estúdio Fotográfico",
+      shortName: "Estúdio",
+      table: "Base estúdio",
+      background: "radial-gradient(circle at 50% 35%, #f7f8fa 0%, #d7dce3 42%, #aab6c1 100%)",
+      floor: "#f0f2f5",
+      ambientIntensity: 1.05,
+      mainIntensity: 1.55,
+      keyPosition: [2.5, 5.1, 3.2],
+      tableColor: "#eaedf2",
+      tableOpacity: 0.82,
+    },
+    {
+      id: "bedroom_clean",
+      name: "Quarto Clean",
+      shortName: "Quarto",
+      table: "Mesa clara",
+      background: "radial-gradient(circle at 60% 24%, #f9f9f7 0%, #d8d9d5 46%, #c8ccc8 100%)",
+      floor: "#f3f3ef",
+      ambientIntensity: 0.9,
+      mainIntensity: 1.25,
+      keyPosition: [1.9, 4.6, 4.0],
+      tableColor: "#eff0ec",
+      tableOpacity: 0.76,
+    },
   ]), []);
 
   const total = pages.length;
@@ -2053,6 +2089,10 @@ function Preview3D({ pages, photoMap }) {
   const page = pages[index] || coverPage || null;
   const activeMeta = getPreview3DMeta(page || coverPage);
   const ambient = ambients[ambientIndex] || ambients[0];
+  const sceneStyle = {
+    "--ambient-background": ambient.background,
+    "--ambient-floor": ambient.floor,
+  };
   const hasCoverPhoto = Boolean(coverPage?.cover?.photoId && photoMap.get(coverPage.cover.photoId));
   const renderPage = viewMode === "open" ? (page?.type === "spread" ? page : firstSpread) : (coverPage || page);
   const bookClass = [
@@ -2132,16 +2172,37 @@ function Preview3D({ pages, photoMap }) {
   }, [total, index, pages, ambients.length]);
 
   return (
-    <div className="preview3d-shell premium-scene-shell">
-      <div className={`premium-scene-wrap ambient-${ambient.id}`}>
-        <div className="premium-scene-background" aria-hidden="true">
-          <div className="room-wall wall-left" />
-          <div className="room-wall wall-right" />
-          <div className="room-window" />
-          <div className="room-sofa" />
-          <div className="room-lamp lamp-left" />
-          <div className="room-lamp lamp-right" />
-        </div>
+    <div className="preview3d-shell preview3d-premium" style={sceneStyle}>
+      <div className="preview3d-premium-wrap">
+        <div className="preview3d-premium-backdrop" aria-hidden="true" />
+        <div className="preview3d-premium-floor" aria-hidden="true" />
+        <Canvas
+          shadows
+          dpr={[1, 1.5]}
+          gl={{ alpha: true }}
+          camera={{ position: [0, 1.7, 4.3], fov: 32 }}
+          className="preview3d-real-canvas"
+        >
+          <color attach="background" args={["transparent"]} />
+          <fog attach="fog" args={["#f3f2ee", 5, 12]} />
+          <Preview3DLighting ambient={ambient} />
+          <Preview3DEnvironment />
+          <PresentationControls
+            global
+            config={{ mass: 1.2, tension: 90 }}
+            snap={{ mass: 0.28, tension: 120 }}
+            rotation={[0, 0, 0]}
+            polar={[-Math.PI / 3.8, Math.PI / 3.8]}
+            azimuth={[-Math.PI / 2.2, Math.PI / 2.2]}
+            cursor={true}
+          >
+            <group scale={[zoom, zoom, zoom]}>
+              <RealAlbum3DMVP page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={viewMode} />
+            </group>
+          </PresentationControls>
+          <ContactShadows position={[0, -0.14, 0]} opacity={0.55} width={5.4} height={5.4} blur={2.4} far={0.3} />
+          <Environment preset="city" background={false} />
+        </Canvas>
 
         <div className="preview3d-config-badges premium-scene-badges" aria-label="Configuração usada no preview 3D">
           <span>{activeMeta.model}</span>
@@ -2159,25 +2220,6 @@ function Preview3D({ pages, photoMap }) {
           <button type="button" onClick={() => zoomBy(0.08)}>Zoom +</button>
           <button type="button" onClick={() => zoomBy(-0.08)}>Zoom -</button>
           <button type="button" onClick={resetView}>Reset</button>
-        </div>
-
-        <div className="premium-scene-stage">
-          <div className="premium-scene-table" aria-hidden="true">
-            <div className="table-highlight" />
-            <div className="table-shadow" />
-          </div>
-            <div className={bookClass} style={{ "--scene-zoom": zoom }}>
-            {viewMode === "open" ? (
-              <SpreadShowroomPreview page={renderPage} photoMap={photoMap} />
-            ) : (
-              <CoverShowroomPreview page={coverPage || renderPage} photoMap={photoMap} />
-            )}
-          </div>
-          {!hasCoverPhoto && viewMode !== "open" && (
-            <div className="premium-scene-warning">
-              Adicione uma foto para pré-visualizar a capa
-            </div>
-          )}
         </div>
 
         <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
@@ -2218,7 +2260,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V5.2 preview premium clean: prévia limpa de álbum físico com capa, verso, lombada e miolo.
+        V5.3 restore real 3D preview: álbum físico com palco realístico, câmera ativa e luz natural.
       </p>
     </div>
   );
