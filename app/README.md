@@ -1,12 +1,12 @@
-# Diagramador Picmimos V5.2 Preview Premium Clean
+# Diagramador Picmimos V5.3 Restore Real 3D Preview
 
-Versão focada somente no preview/modal 3D.
+Versão focada em restaurar o preview/modal 3D real, com álbum centralizado, câmera útil e cenário físico simples.
 
 ## Objetivo
 
-Limpar o visual da pré-visualização 3D, removendo a sensação de protótipo da V5.1 e deixando o álbum físico como protagonista.
+Recuperar a experiência 3D real da V5.1, mantendo a interface limpa da V5.2 e sem afetar editor 2D, upload, layouts, crop ou texto.
 
-## Escopo da V5.2
+## Escopo da V5.3
 
 - Fundo premium claro e contínuo.
 - Produto maior, mais centralizado e com menos inclinação.

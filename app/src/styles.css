@@ -1036,6 +1036,11 @@ input:focus {
 .preview3d-shell {
   display: grid;
   gap: 12px;
+  position: relative;
+}
+
+.preview3d-premium-wrap {
+  position: relative;
 }
 
 .preview3d-canvas-wrap {
