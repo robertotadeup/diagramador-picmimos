@@ -1,3 +1,3 @@
-V4.1.1 Hotfix Preview Premium Visível
+V5.1 Preview Premium
 
-Mudança principal: preview 3D agora usa conceito de ambiente premium, mesa/base, sombra e câmera controlada. Mantém editor 2D, gabaritos e estrutura preparada para plugin WordPress/WooCommerce.
+Mudança principal: preview 3D estruturado com visual de produto físico real (capa, verso, lombada e miolo), mantendo editor 2D intacto e respeitando regra comercial de lombada (1 lâmina = 1 mm).
