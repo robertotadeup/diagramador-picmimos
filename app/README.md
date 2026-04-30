@@ -1,20 +1,20 @@
-# Diagramador Picmimos V5.5 Preview 3D Realismo Premium
+# Diagramador Picmimos V5.6 Preview 3D Textura Real e Câmera Comercial
 
-Versão focada em melhorar o realismo visual do preview/modal 3D, mantendo intacto o editor 2D.
+Versão focada em corrigir o preview/modal 3D com prioridade em leitura real do projeto: capa, lombada, verso e páginas precisam aparecer com textura/imagem clara, sem depender de um render 3D lavado.
 
 ## Objetivo
 
-Transformar o preview 3D em uma apresentação mais próxima de um mockup comercial de álbum físico: capa com textura mais legível, miolo com presença real, iluminação menos lavada, sombra mais convincente e câmera mais valorizada.
+Trocar o foco de “efeito 3D genérico” para um mockup comercial confiável: câmera travada por modo, arte/página legível, fundo premium com contraste e controles visíveis.
 
-## Escopo da V5.5
+## Escopo da V5.6
 
-- Mantém a organização da V5.4: informações, controles e ambientes fora do Canvas.
-- Usa o modelo 3D mais rico/GLB-ready já presente no projeto para dar mais volume ao álbum.
-- Melhora contraste dos ambientes Sala, Estúdio e Quarto.
-- Reduz aspecto de bloco branco e cenário lavado.
-- Melhora materiais de capa, página, lombada, acrílico e sombra.
-- Cria poses mais comerciais para Capa, Aberto, Lombada e Verso.
-- Não altera editor 2D, upload, layouts, crop, texto, validações ou productConfigs.js.
+- Preview 3D comercial em DOM/CSS 2.5D para maior fidelidade visual.
+- Capa com foto/arte real ou placeholder claro quando faltar imagem.
+- Páginas abertas com fotos e textos visíveis a partir do projeto.
+- Lombada e verso mais limpos, sem peças estranhas/tubos/trilhos.
+- Ambiente menos lavado e com mais contraste.
+- Controles e badges fora da área visual principal.
+- Sem alteração no editor 2D, upload, layouts, crop, textos, validações, productConfigs, package.json ou package-lock.
 
 ## Arquivos alterados
 
@@ -22,7 +22,3 @@ Transformar o preview 3D em uma apresentação mais próxima de um mockup comerc
 - `app/src/styles.css`
 - `app/README.md`
 - `app/VERSION.txt`
-
-## Observação estratégica
-
-Este editor continua preparado para virar plugin WordPress/WooCommerce configurável para laboratórios e encadernadoras. A V5.5 não implementa o plugin; ela apenas melhora o motor visual do preview 3D sem amarrar a experiência a uma configuração fixa.
