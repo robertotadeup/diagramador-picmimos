@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V5.4 Preview 3D Premium Organizado",
+      version: "V5.5 Preview 3D Realismo Premium",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.4 Preview 3D Premium Organizado</strong>
-            <span>Preview 3D premium com álbum físico centralizado, luz suave e controles organizados</span>
+            <strong>Diagramador Picmimos V5.5 Preview 3D Realismo Premium</strong>
+            <span>Preview 3D com álbum físico mais realista, materiais melhores e visual premium</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2046,40 +2046,46 @@ function Preview3D({ pages, photoMap }) {
       id: "luxury_living",
       name: "Sala Premium",
       shortName: "Sala",
-      table: "Mesa de vidro",
-      background: "radial-gradient(circle at 30% 24%, #f9f5ea 0%, #d9c8ab 48%, #c2b09a 100%)",
-      floor: "#ede3d5",
-      ambientIntensity: 0.95,
-      mainIntensity: 1.35,
-      keyPosition: [2.8, 5.2, 3.8],
-      tableColor: "#f5eee6",
-      tableOpacity: 0.72,
+      table: "Mesa quente",
+      background: "radial-gradient(circle at 34% 20%, #fff7ea 0%, #e7cfaa 42%, #b99d76 100%)",
+      floor: "#d7c0a0",
+      ambientIntensity: 0.72,
+      mainIntensity: 1.18,
+      fillIntensity: 0.18,
+      rimIntensity: 0.34,
+      keyPosition: [2.9, 4.7, 3.2],
+      tableColor: "#d8c3a4",
+      tableOpacity: 0.38,
     },
     {
       id: "photo_studio",
       name: "Estúdio Fotográfico",
       shortName: "Estúdio",
-      table: "Base estúdio",
-      background: "radial-gradient(circle at 50% 35%, #f7f8fa 0%, #d7dce3 42%, #aab6c1 100%)",
-      floor: "#f0f2f5",
-      ambientIntensity: 1.05,
-      mainIntensity: 1.55,
-      keyPosition: [2.5, 5.1, 3.2],
-      tableColor: "#eaedf2",
-      tableOpacity: 0.82,
+      table: "Base fosca",
+      background: "radial-gradient(circle at 50% 26%, #f6f3ed 0%, #d9d3c9 46%, #aeb7bd 100%)",
+      floor: "#d8d6d0",
+      ambientIntensity: 0.8,
+      mainIntensity: 1.22,
+      fillIntensity: 0.2,
+      rimIntensity: 0.4,
+      keyPosition: [2.7, 4.8, 3.4],
+      tableColor: "#d2d2cc",
+      tableOpacity: 0.36,
     },
     {
       id: "bedroom_clean",
       name: "Quarto Clean",
       shortName: "Quarto",
       table: "Mesa clara",
-      background: "radial-gradient(circle at 60% 24%, #f9f9f7 0%, #d8d9d5 46%, #c8ccc8 100%)",
-      floor: "#f3f3ef",
-      ambientIntensity: 0.9,
-      mainIntensity: 1.25,
-      keyPosition: [1.9, 4.6, 4.0],
-      tableColor: "#eff0ec",
-      tableOpacity: 0.76,
+      background: "radial-gradient(circle at 58% 20%, #fffaf2 0%, #ded7ca 45%, #afb4aa 100%)",
+      floor: "#d9d7cf",
+      ambientIntensity: 0.7,
+      mainIntensity: 1.08,
+      fillIntensity: 0.16,
+      rimIntensity: 0.32,
+      keyPosition: [2.2, 4.5, 3.8],
+      tableColor: "#dcd8cc",
+      tableOpacity: 0.34,
     },
   ]), []);
 
@@ -2092,6 +2098,7 @@ function Preview3D({ pages, photoMap }) {
   const sceneStyle = {
     "--ambient-background": ambient.background,
     "--ambient-floor": ambient.floor,
+    "--ambient-table": ambient.tableColor,
   };
   const hasCoverPhoto = Boolean(coverPage?.cover?.photoId && photoMap.get(coverPage.cover.photoId));
   const renderPage = viewMode === "open" ? (page?.type === "spread" ? page : firstSpread) : (coverPage || page);
@@ -2198,11 +2205,11 @@ function Preview3D({ pages, photoMap }) {
           shadows
           dpr={[1, 1.5]}
           gl={{ alpha: true, antialias: true }}
-          camera={{ position: [0, 1.35, 4.25], fov: 32 }}
+          camera={{ position: [0, 1.48, 4.05], fov: 30 }}
           className="preview3d-real-canvas"
         >
           <color attach="background" args={["transparent"]} />
-          <fog attach="fog" args={["#f4f1eb", 5.4, 12]} />
+          <fog attach="fog" args={["#e8ded0", 7.2, 15]} />
           <Preview3DLighting ambient={ambient} />
           <Preview3DEnvironment />
           <PresentationControls
@@ -2214,11 +2221,11 @@ function Preview3D({ pages, photoMap }) {
             azimuth={[-Math.PI / 2.4, Math.PI / 2.4]}
             cursor={true}
           >
-            <group position={[0, -0.08, 0]} scale={[zoom * 1.08, zoom * 1.08, zoom * 1.08]}>
-              <RealAlbum3DMVP page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={viewMode} />
+            <group position={[0, -0.02, 0]} scale={[zoom * 1.18, zoom * 1.18, zoom * 1.18]}>
+              <AlbumGLBReadyV4 page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={viewMode} />
             </group>
           </PresentationControls>
-          <ContactShadows position={[0, -0.18, 0]} opacity={0.42} width={4.2} height={4.2} blur={2.1} far={0.28} />
+          <ContactShadows position={[0, -0.13, 0]} opacity={0.58} width={3.6} height={3.6} blur={1.75} far={0.28} />
           <Environment preset="city" background={false} />
         </Canvas>
 
@@ -2261,7 +2268,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V5.4 preview 3D premium organizado: álbum físico centralizado, palco limpo, câmera ativa e controles fora da área principal.
+        V5.5 preview 3D realismo premium: álbum físico com melhor material, câmera mais comercial, sombras suaves e ambiente mais elegante.
       </p>
     </div>
   );
@@ -2270,22 +2277,23 @@ function Preview3D({ pages, photoMap }) {
 function Preview3DLighting({ ambient }) {
   return (
     <>
-      <ambientLight intensity={ambient?.ambientIntensity ?? 0.9} />
-      <hemisphereLight args={["#ffffff", "#bfa27a", 0.62]} />
+      <ambientLight intensity={ambient?.ambientIntensity ?? 0.72} />
+      <hemisphereLight args={["#fff4df", "#7f6b52", 0.46]} />
       <directionalLight
         castShadow
-        position={ambient?.keyPosition || [3.4, 5.1, 4.6]}
-        intensity={ambient?.mainIntensity ?? 1.45}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        position={ambient?.keyPosition || [2.8, 4.8, 3.4]}
+        intensity={ambient?.mainIntensity ?? 1.16}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-near={0.1}
         shadow-camera-far={12}
-        shadow-camera-left={-4}
-        shadow-camera-right={4}
-        shadow-camera-top={4}
-        shadow-camera-bottom={-4}
+        shadow-camera-left={-3.8}
+        shadow-camera-right={3.8}
+        shadow-camera-top={3.8}
+        shadow-camera-bottom={-3.8}
       />
-      <directionalLight position={[-3, 2.4, -2.5]} intensity={0.25} />
+      <directionalLight position={[-3.2, 2.0, -2.8]} intensity={ambient?.fillIntensity ?? 0.18} />
+      <directionalLight position={[0, 2.7, -3.8]} intensity={ambient?.rimIntensity ?? 0.34} />
     </>
   );
 }
@@ -2454,29 +2462,33 @@ function getPreview3DMeta(page) {
 function Preview3DEnvironment() {
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]}>
-        <circleGeometry args={[2.75, 128]} />
-        <meshStandardMaterial color="#eee6da" roughness={0.72} metalness={0.01} transparent opacity={0.72} />
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.145, 0]}>
+        <circleGeometry args={[2.05, 128]} />
+        <meshStandardMaterial color="#cdb897" roughness={0.86} metalness={0.01} transparent opacity={0.36} />
       </mesh>
-      <mesh receiveShadow position={[0, 0.72, -2.85]}>
-        <planeGeometry args={[7.2, 3.4]} />
-        <meshStandardMaterial color="#edf0f2" roughness={0.94} transparent opacity={0.46} />
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.142, 0]}>
+        <ringGeometry args={[0.92, 2.02, 128]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.08} side={THREE.DoubleSide} />
       </mesh>
-      <mesh receiveShadow position={[-2.5, 0.56, -2.38]} rotation={[0, 0.5, 0]}>
-        <planeGeometry args={[2.6, 2.6]} />
-        <meshStandardMaterial color="#e8ecef" roughness={0.94} transparent opacity={0.34} />
+      <mesh receiveShadow position={[0, 0.78, -2.95]}>
+        <planeGeometry args={[6.8, 3.25]} />
+        <meshStandardMaterial color="#d8d0c2" roughness={0.96} transparent opacity={0.34} />
       </mesh>
-      <mesh receiveShadow position={[2.5, 0.56, -2.38]} rotation={[0, -0.5, 0]}>
-        <planeGeometry args={[2.6, 2.6]} />
-        <meshStandardMaterial color="#f0f1ef" roughness={0.94} transparent opacity={0.34} />
+      <mesh receiveShadow position={[-2.44, 0.55, -2.48]} rotation={[0, 0.42, 0]}>
+        <planeGeometry args={[2.3, 2.45]} />
+        <meshStandardMaterial color="#d1d7d5" roughness={0.96} transparent opacity={0.22} />
       </mesh>
-      <mesh position={[-1.78, 0.74, -2.82]}>
-        <planeGeometry args={[0.8, 1.16]} />
-        <meshStandardMaterial color="#fff7e4" roughness={0.86} transparent opacity={0.26} />
+      <mesh receiveShadow position={[2.44, 0.55, -2.48]} rotation={[0, -0.42, 0]}>
+        <planeGeometry args={[2.3, 2.45]} />
+        <meshStandardMaterial color="#e1ddd3" roughness={0.96} transparent opacity={0.22} />
       </mesh>
-      <mesh position={[1.75, 0.76, -2.82]}>
-        <planeGeometry args={[0.88, 1.22]} />
-        <meshStandardMaterial color="#dde9f4" roughness={0.86} transparent opacity={0.22} />
+      <mesh position={[-1.58, 0.84, -2.86]}>
+        <planeGeometry args={[0.68, 1.0]} />
+        <meshBasicMaterial color="#fff3d3" transparent opacity={0.18} />
+      </mesh>
+      <mesh position={[1.58, 0.84, -2.86]}>
+        <planeGeometry args={[0.72, 1.06]} />
+        <meshBasicMaterial color="#e9f0f4" transparent opacity={0.16} />
       </mesh>
     </group>
   );
@@ -2540,8 +2552,18 @@ function loadImageElement(src) {
 
 function drawImageCover(ctx, image, x, y, w, h, cropX = 0, cropY = 0, cropScale = 1) {
   if (!image) {
-    ctx.fillStyle = '#d8d2c8';
+    const gradient = ctx.createLinearGradient(x, y, x + w, y + h);
+    gradient.addColorStop(0, '#cbb995');
+    gradient.addColorStop(0.48, '#efe4d2');
+    gradient.addColorStop(1, '#9f8a68');
+    ctx.fillStyle = gradient;
     ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = '#ffffff';
+    for (let line = -w; line < w * 2; line += 36) {
+      ctx.fillRect(x + line, y, 7, h * 1.7);
+    }
+    ctx.globalAlpha = 1;
     return;
   }
   const iw = image.naturalWidth || image.width || 1;
@@ -2631,12 +2653,16 @@ async function buildCoverCanvas(page, photoMap) {
     if (image) {
       drawImageCover(fullCtx, image, 0, 0, fullWidth, fullHeight, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
     } else {
-      fullCtx.fillStyle = '#d8d2c8';
+      const gradient = fullCtx.createLinearGradient(0, 0, fullWidth, fullHeight);
+      gradient.addColorStop(0, '#bda47d');
+      gradient.addColorStop(0.55, '#efe2cb');
+      gradient.addColorStop(1, '#7e6a4e');
+      fullCtx.fillStyle = gradient;
       fullCtx.fillRect(0, 0, fullWidth, fullHeight);
-      fullCtx.fillStyle = '#5a5246';
-      fullCtx.font = '700 34px system-ui';
+      fullCtx.fillStyle = 'rgba(36,30,22,.62)';
+      fullCtx.font = '700 42px system-ui';
       fullCtx.textAlign = 'center';
-      fullCtx.fillText('Sem arte completa da capa', fullWidth / 2, fullHeight / 2);
+      fullCtx.fillText('Adicione a foto da capa', fullWidth / 2, fullHeight / 2);
     }
     const sx = Math.round((panel.backRatio + panel.spineRatio) * fullWidth);
     ctx.drawImage(fullCanvas, sx, 0, Math.max(1, panel.frontRatio * fullWidth), fullHeight, 0, 0, width, height);
@@ -2646,12 +2672,18 @@ async function buildCoverCanvas(page, photoMap) {
     if (image) {
       drawImageCover(ctx, image, 0, 0, width, height, page.cover?.cropX, page.cover?.cropY, page.cover?.cropScale);
     } else {
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fillRect(width * 0.08, height * 0.08, width * 0.84, height * 0.84);
-      ctx.fillStyle = '#5a5246';
-      ctx.font = '600 32px system-ui';
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, 'rgba(255,255,255,.18)');
+      gradient.addColorStop(1, 'rgba(0,0,0,.14)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(width * 0.055, height * 0.055, width * 0.89, height * 0.89);
+      ctx.strokeStyle = 'rgba(255,255,255,.48)';
+      ctx.lineWidth = 7;
+      ctx.strokeRect(width * 0.07, height * 0.07, width * 0.86, height * 0.86);
+      ctx.fillStyle = 'rgba(36,30,22,.68)';
+      ctx.font = '700 32px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText('Sem foto na capa', width / 2, height / 2);
+      ctx.fillText('Adicione a foto da capa', width / 2, height / 2);
     }
   }
 
@@ -2912,11 +2944,13 @@ function TopTexturePlane({ texture, width, depth, y = 0.05, opacity = 1, roughne
   return (
     <mesh position={[0, y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[width, depth]} />
-      <meshStandardMaterial
+      <meshPhysicalMaterial
         map={texture || null}
         color={texture ? '#ffffff' : '#f3efe7'}
         roughness={roughness}
         metalness={0.0}
+        clearcoat={texture ? 0.28 : 0.06}
+        clearcoatRoughness={0.22}
         transparent={opacity < 1}
         opacity={opacity}
         toneMapped={false}
@@ -2959,7 +2993,7 @@ function AlbumGLBReadyV4({ page, coverPage, photoMap, mode = "cover" }) {
   });
 
   return (
-    <group ref={groupRef} rotation={preset.rotation} position={preset.position}>
+    <group ref={groupRef} rotation={preset.rotation} position={preset.position} scale={preset.scale || [1, 1, 1]}>
       {isOpen ? (
         <OpenAlbumGLBReadyV4 page={safePage?.type === "spread" ? safePage : null} coverPage={closedPage} photoMap={photoMap} />
       ) : (
@@ -2970,10 +3004,10 @@ function AlbumGLBReadyV4({ page, coverPage, photoMap, mode = "cover" }) {
 }
 
 function getV4ViewPreset(mode, isOpen) {
-  if (isOpen) return { rotation: [-0.02, -0.16, 0.0], position: [0, 0, 0] };
-  if (mode === "spine") return { rotation: [-0.02, -1.22, 0.02], position: [0.05, 0, 0] };
-  if (mode === "back") return { rotation: [-0.02, Math.PI - 0.34, 0.0], position: [0, 0, 0] };
-  return { rotation: [-0.02, -0.34, 0.0], position: [0, 0, 0] };
+  if (isOpen) return { rotation: [-0.06, -0.18, 0.0], position: [0, -0.02, 0.02], scale: [1.04, 1.04, 1.04] };
+  if (mode === "spine") return { rotation: [-0.03, -1.32, 0.015], position: [0.05, 0.02, 0], scale: [1.08, 1.08, 1.08] };
+  if (mode === "back") return { rotation: [-0.03, Math.PI - 0.32, 0.0], position: [0.02, 0.02, 0], scale: [1.08, 1.08, 1.08] };
+  return { rotation: [-0.035, -0.34, 0.0], position: [0.02, 0.02, 0], scale: [1.10, 1.10, 1.10] };
 }
 
 function V4StudioBase() {
@@ -2994,7 +3028,7 @@ function V4StudioBase() {
 function V4RoundedBoard({ args, position, color = "#f6f1e8", roughness = 0.68, radius = 0.035, children }) {
   return (
     <RoundedBox castShadow receiveShadow args={args} radius={radius} smoothness={8} position={position}>
-      <meshStandardMaterial color={color} roughness={roughness} metalness={0.0} />
+      <meshPhysicalMaterial color={color} roughness={roughness} metalness={0.0} clearcoat={0.16} clearcoatRoughness={0.26} />
       {children}
     </RoundedBox>
   );
@@ -3004,11 +3038,13 @@ function V4TopTexture({ texture, width, depth, y, x = 0, z = 0, roughness = 0.5,
   return (
     <mesh position={[x, y, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[width, depth]} />
-      <meshStandardMaterial
+      <meshPhysicalMaterial
         map={texture || null}
         color={texture ? "#ffffff" : "#f7f2e8"}
         roughness={roughness}
         metalness={0}
+        clearcoat={texture ? 0.24 : 0.04}
+        clearcoatRoughness={0.24}
         transparent={opacity < 1}
         opacity={opacity}
         toneMapped={false}
@@ -3079,9 +3115,9 @@ function ClosedAlbumGLBReadyV4({ page, photoMap, mode = "cover" }) {
 
   return (
     <group>
-      <V4RoundedBoard args={[coverW * 0.98, blockThickness, coverH * 0.96]} position={[0.06, blockThickness / 2 - 0.012, 0.03]} color="#eee7db" roughness={0.86} radius={0.025} />
+      <V4RoundedBoard args={[coverW * 0.98, blockThickness, coverH * 0.96]} position={[0.06, blockThickness / 2 - 0.012, 0.03]} color="#e6dccb" roughness={0.9} radius={0.025} />
       <V4PageEdgeLines width={coverW * 0.88} depth={coverH * 0.94} y={blockThickness + 0.005} count={9} />
-      <V4RoundedBoard args={[coverW, coverThickness, coverH]} position={[0, boardY, 0]} color={isBack ? coverColor : "#fbf6ee"} roughness={0.68} radius={0.04} />
+      <V4RoundedBoard args={[coverW, coverThickness, coverH]} position={[0, boardY, 0]} color={isBack ? coverColor : "#f3eadc"} roughness={0.64} radius={0.04} />
       <V4TopTexture texture={visibleTexture} width={coverW * 0.965} depth={coverH * 0.955} y={topY} roughness={hasAcrylic ? 0.22 : 0.48} />
       {hasAcrylic && <V4AcrylicLayer width={coverW * 0.965} depth={coverH * 0.955} y={topY + 0.006} />}
       <V4RoundedBoard args={[Math.max(spineW, 0.075), coverThickness * 1.12, coverH]} position={[-coverW / 2 - Math.max(spineW, 0.075) / 2 + 0.006, boardY + 0.002, 0]} color={coverColor} roughness={0.82} radius={0.024} />
@@ -3116,9 +3152,9 @@ function OpenAlbumGLBReadyV4({ page, coverPage, photoMap }) {
         <V4RoundedBoard args={[halfW, coverThickness, spreadH * 1.02]} position={[0, 0, 0]} color="#fbf7ef" roughness={0.72} radius={0.035} />
         <V4TopTexture texture={frontTexture} width={halfW * 0.96} depth={spreadH * 0.96} y={coverThickness / 2 + 0.006} roughness={0.48} />
       </group>
-      <V4RoundedBoard args={[spreadW * 0.985, blockThickness, spreadH * 0.965]} position={[0, coverThickness + blockThickness / 2, 0]} color="#eee7db" roughness={0.9} radius={0.018} />
+      <V4RoundedBoard args={[spreadW * 0.985, blockThickness, spreadH * 0.965]} position={[0, coverThickness + blockThickness / 2, 0]} color="#e4dac9" roughness={0.92} radius={0.018} />
       <V4PageEdgeLines width={spreadW * 0.92} depth={spreadH * 0.94} y={coverThickness + blockThickness + 0.002} count={10} />
-      <V4RoundedBoard args={[spreadW, pageThickness, spreadH]} position={[0, coverThickness + blockThickness + pageThickness / 2, 0]} color="#fffdf8" roughness={0.5} radius={0.018} />
+      <V4RoundedBoard args={[spreadW, pageThickness, spreadH]} position={[0, coverThickness + blockThickness + pageThickness / 2, 0]} color="#fff9ef" roughness={0.46} radius={0.018} />
       <V4TopTexture texture={spreadTexture} width={spreadW * 0.988} depth={spreadH * 0.988} y={topY} roughness={0.38} />
       <mesh castShadow receiveShadow position={[0, topY + 0.006, 0]}>
         <boxGeometry args={[0.018, 0.014, spreadH * 1.01]} />
@@ -3434,7 +3470,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         )}
         {modal.type === "preview-3d" && (
           <>
-            <h2>Pré-visualização 3D V5.4</h2>
+            <h2>Pré-visualização 3D V5.5</h2>
             <Preview3D pages={modal.pages || []} photoMap={photoMap} />
             <p>Use as setas na tela ou as teclas ← e → para folhear. Use o mouse para girar o álbum e os botões de zoom para aproximar ou afastar.</p>
           </>
