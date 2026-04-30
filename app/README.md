@@ -1,6 +1,6 @@
-# Diagramador Picmimos V5 Preview 3D Real Estruturado
+# Diagramador Picmimos V5.1 Preview Premium
 
-Versão focada em consolidar o preview 3D como produto físico real sem mexer no editor 2D já funcionando.
+Versão focada em refinar somente o preview/modal 3D com visual premium limpo, sem mexer no editor 2D.
 
 ## Principais mudanças
 
