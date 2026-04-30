@@ -1,20 +1,20 @@
-# Diagramador Picmimos V5.4 Preview 3D Premium Organizado
+# Diagramador Picmimos V5.5 Preview 3D Realismo Premium
 
-Versão focada em organizar somente o preview/modal 3D, mantendo o editor 2D intacto.
+Versão focada em melhorar o realismo visual do preview/modal 3D, mantendo intacto o editor 2D.
 
 ## Objetivo
 
-Corrigir a bagunça visual da V5.3 no modal 3D: separar informações, controles, Canvas e navegação; deixar o álbum físico mais centralizado; reduzir o destaque do palco/floor; e atualizar todos os textos internos para V5.4.
+Transformar o preview 3D em uma apresentação mais próxima de um mockup comercial de álbum físico: capa com textura mais legível, miolo com presença real, iluminação menos lavada, sombra mais convincente e câmera mais valorizada.
 
-## Escopo da V5.4
+## Escopo da V5.5
 
-- Preview 3D com Canvas/Three.js mantido.
-- Faixa de informações do produto fora da área principal do álbum.
-- Controles Capa, Aberto, Lombada, Verso, Zoom +, Zoom - e Reset fora do Canvas.
-- Palco mais limpo e menos chamativo.
-- Álbum mais centralizado, com sombra e luz mais suaves.
-- Navegação de ambiente e páginas mais discreta.
-- Sem alteração no editor 2D, upload, layouts, crop, textos, validações, productConfigs, package.json ou package-lock.
+- Mantém a organização da V5.4: informações, controles e ambientes fora do Canvas.
+- Usa o modelo 3D mais rico/GLB-ready já presente no projeto para dar mais volume ao álbum.
+- Melhora contraste dos ambientes Sala, Estúdio e Quarto.
+- Reduz aspecto de bloco branco e cenário lavado.
+- Melhora materiais de capa, página, lombada, acrílico e sombra.
+- Cria poses mais comerciais para Capa, Aberto, Lombada e Verso.
+- Não altera editor 2D, upload, layouts, crop, texto, validações ou productConfigs.js.
 
 ## Arquivos alterados
 
@@ -23,8 +23,6 @@ Corrigir a bagunça visual da V5.3 no modal 3D: separar informações, controles
 - `app/README.md`
 - `app/VERSION.txt`
 
----
+## Observação estratégica
 
-# Histórico anterior
-
-A V5.3 restaurou o preview 3D real depois da V5.2, mas ainda deixou textos visíveis como V5.2 e manteve controles sobre a cena. A V5.4 organiza essa camada sem mexer na base do editor.
+Este editor continua preparado para virar plugin WordPress/WooCommerce configurável para laboratórios e encadernadoras. A V5.5 não implementa o plugin; ela apenas melhora o motor visual do preview 3D sem amarrar a experiência a uma configuração fixa.
