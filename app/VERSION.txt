@@ -1,3 +1,1 @@
-V5.1 Preview Premium
-
-Mudança principal: showroom/modal 3D com visual limpo, controles menores e navegação discreta, mantendo editor 2D intacto.
+V5.2 Preview Premium Clean
