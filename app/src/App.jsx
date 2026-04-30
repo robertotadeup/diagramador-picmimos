@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V4.1.1 Hotfix Preview Premium Visível",
+      version: "V5.2 Preview Premium Clean",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V4.1.1 Hotfix Preview Premium Visível</strong>
-            <span>Configuração central + gabarito + preview 3D com ambiente, mesa/base e sombra</span>
+            <strong>Diagramador Picmimos V5.2 Preview Premium Clean</strong>
+            <span>Preview/modal 3D com showroom limpo, produto central e controles discretos</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2143,27 +2143,6 @@ function Preview3D({ pages, photoMap }) {
           <div className="room-lamp lamp-right" />
         </div>
 
-        <div className="preview3d-config-badges premium-scene-badges" aria-label="Configuração usada no preview 3D">
-          <span>{activeMeta.model}</span>
-          <span>{activeMeta.format}</span>
-          <span>{activeMeta.lombada}</span>
-          <span>{activeMeta.coverType}</span>
-          <span>{ambient.shortName}</span>
-        </div>
-
-        <div className="preview3d-motion-controls premium-scene-controls" aria-label="Controles de visualização 3D">
-          <button type="button" className={viewMode === "cover" ? "on" : ""} onClick={() => setViewMode("cover")}>Capa</button>
-          <button type="button" className={viewMode === "open" ? "on" : ""} onClick={() => setViewMode("open")}>Aberto</button>
-          <button type="button" className={viewMode === "spine" ? "on" : ""} onClick={() => setViewMode("spine")}>Lombada</button>
-          <button type="button" className={viewMode === "back" ? "on" : ""} onClick={() => setViewMode("back")}>Verso</button>
-          <button type="button" onClick={() => go(-1)} disabled={index <= 0}>Página anterior</button>
-          <button type="button" onClick={() => go(1)} disabled={index >= total - 1}>Próxima página</button>
-          <button type="button" onClick={() => zoomBy(0.08)}>Zoom +</button>
-          <button type="button" onClick={() => zoomBy(-0.08)}>Zoom -</button>
-          <button type="button" onClick={nextAmbient}>Cenário</button>
-          <button type="button" onClick={resetView}>Reset</button>
-        </div>
-
         <div className="premium-scene-stage">
           <div className="premium-scene-table" aria-hidden="true">
             <div className="table-highlight" />
@@ -2178,7 +2157,7 @@ function Preview3D({ pages, photoMap }) {
           </div>
           {!hasCoverPhoto && viewMode !== "open" && (
             <div className="premium-scene-warning">
-              A capa ainda não tem foto/arte aplicada. Arraste uma foto para a capa no editor 2D.
+              Adicione uma foto para visualizar a capa
             </div>
           )}
         </div>
@@ -2190,21 +2169,21 @@ function Preview3D({ pages, photoMap }) {
           <span>{page?.title || "Prévia"}</span>
           <strong>{index + 1} / {Math.max(total, 1)}</strong>
         </div>
-
-        <div className="preview3d-ambient-switcher premium-scene-ambient-switcher" aria-label="Trocar cenário do preview 3D">
-          {ambients.map((item, itemIndex) => (
-            <button
-              type="button"
-              key={item.id}
-              className={`preview3d-ambient-chip ${itemIndex === ambientIndex ? "on" : ""}`}
-              onClick={() => setAmbientIndex(itemIndex)}
-              aria-label={`Usar cenário ${item.name}`}
-            >
-              <span className="preview3d-ambient-thumb" data-ambient={item.id} />
-              <strong>{item.shortName}</strong>
-            </button>
-          ))}
-        </div>
+      </div>
+      <div className="premium-scene-meta-strip">
+        <span>{activeMeta.model}</span>
+        <span>{activeMeta.format}</span>
+        <span>{activeMeta.lombada}</span>
+        <span>{activeMeta.coverType}</span>
+      </div>
+      <div className="preview3d-motion-controls premium-scene-controls-bar" aria-label="Controles de visualização 3D">
+          <button type="button" className={viewMode === "cover" ? "on" : ""} onClick={() => setViewMode("cover")}>Capa</button>
+          <button type="button" className={viewMode === "open" ? "on" : ""} onClick={() => setViewMode("open")}>Aberto</button>
+          <button type="button" className={viewMode === "spine" ? "on" : ""} onClick={() => setViewMode("spine")}>Lombada</button>
+          <button type="button" className={viewMode === "back" ? "on" : ""} onClick={() => setViewMode("back")}>Verso</button>
+          <button type="button" onClick={() => zoomBy(0.08)}>Zoom +</button>
+          <button type="button" onClick={() => zoomBy(-0.08)}>Zoom -</button>
+          <button type="button" onClick={resetView}>Reset</button>
       </div>
 
       <div className="preview3d-dots">
@@ -2219,7 +2198,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V5 preview 3D real estruturado: capa, verso, lombada e miolo com espessura física baseada em lâminas (1 lâmina = 1 mm), usando dados comerciais centralizados e fotos do editor atual.
+        V5.2 preview premium clean: prévia limpa de álbum físico com capa, verso, lombada e miolo.
       </p>
     </div>
   );
@@ -3392,7 +3371,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         )}
         {modal.type === "preview-3d" && (
           <>
-            <h2>Pré-visualização 3D</h2>
+            <h2>Pré-visualização 3D V5.2</h2>
             <Preview3D pages={modal.pages || []} photoMap={photoMap} />
             <p>Use as setas na tela ou as teclas ← e → para folhear. As lâminas viram como placas rígidas de álbum 800g. Use o mouse para girar, aproximar e afastar.</p>
           </>

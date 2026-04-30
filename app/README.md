@@ -1,17 +1,14 @@
-# Diagramador Picmimos V5 Preview 3D Real Estruturado
+# Diagramador Picmimos V5.2 Preview Premium Clean
 
-Versão focada em consolidar o preview 3D como produto físico real sem mexer no editor 2D já funcionando.
+Versão focada em refinar somente o preview/modal 3D com showroom premium limpo, mantendo editor 2D intacto.
 
 ## Principais mudanças
 
-A V5 mantém a base 3D existente e organiza o preview com foco em produto real:
-
-- modos de visualização Capa, Aberto, Lombada e Verso;
-- controles explícitos de Página anterior/Próxima página e Zoom +/Zoom -;
-- visual de capa frontal, capa traseira, lombada e bloco/miolo;
-- regra de lombada respeitada (1 lâmina = 1 mm);
-- arte completa para capa fotográfica personalizada e textura de material para demais modelos;
-- manutenção integral do editor 2D, layouts e validações atuais.
+- visual de showroom minimalista e contínuo no modal 3D;
+- produto maior, centralizado e com perspectiva reduzida;
+- barra de controles discreta fora do palco principal;
+- navegação inferior limpa com setas e bolinhas;
+- placeholder premium da capa quando não houver foto.
 
 ## Instalação
 
