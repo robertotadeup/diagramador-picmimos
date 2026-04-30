@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V5.2 Preview Premium Clean",
+      version: "V5.4 Preview 3D Premium Organizado",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.2 Preview Premium Clean</strong>
-            <span>Preview/modal 3D premium clean com palco limpo de álbum físico</span>
+            <strong>Diagramador Picmimos V5.4 Preview 3D Premium Organizado</strong>
+            <span>Preview 3D premium com álbum físico centralizado, luz suave e controles organizados</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2173,54 +2173,54 @@ function Preview3D({ pages, photoMap }) {
 
   return (
     <div className="preview3d-shell preview3d-premium" style={sceneStyle}>
+      <div className="preview3d-config-badges premium-scene-badges" aria-label="Configuração usada no preview 3D">
+        <span>{activeMeta.model}</span>
+        <span>{activeMeta.format}</span>
+        <span>{activeMeta.lombada}</span>
+        <span>{activeMeta.coverType}</span>
+        <span>{ambient.shortName}</span>
+      </div>
+
+      <div className="preview3d-motion-controls premium-scene-controls" aria-label="Controles de visualização 3D">
+        <button type="button" className={viewMode === "cover" ? "on" : ""} onClick={() => setViewMode("cover")}>Capa</button>
+        <button type="button" className={viewMode === "open" ? "on" : ""} onClick={() => setViewMode("open")}>Aberto</button>
+        <button type="button" className={viewMode === "spine" ? "on" : ""} onClick={() => setViewMode("spine")}>Lombada</button>
+        <button type="button" className={viewMode === "back" ? "on" : ""} onClick={() => setViewMode("back")}>Verso</button>
+        <button type="button" onClick={() => zoomBy(0.08)}>Zoom +</button>
+        <button type="button" onClick={() => zoomBy(-0.08)}>Zoom -</button>
+        <button type="button" onClick={resetView}>Reset</button>
+      </div>
+
       <div className="preview3d-premium-wrap">
         <div className="preview3d-premium-backdrop" aria-hidden="true" />
         <div className="preview3d-premium-floor" aria-hidden="true" />
         <Canvas
           shadows
           dpr={[1, 1.5]}
-          gl={{ alpha: true }}
-          camera={{ position: [0, 1.7, 4.3], fov: 32 }}
+          gl={{ alpha: true, antialias: true }}
+          camera={{ position: [0, 1.35, 4.25], fov: 32 }}
           className="preview3d-real-canvas"
         >
           <color attach="background" args={["transparent"]} />
-          <fog attach="fog" args={["#f3f2ee", 5, 12]} />
+          <fog attach="fog" args={["#f4f1eb", 5.4, 12]} />
           <Preview3DLighting ambient={ambient} />
           <Preview3DEnvironment />
           <PresentationControls
             global
-            config={{ mass: 1.2, tension: 90 }}
-            snap={{ mass: 0.28, tension: 120 }}
+            config={{ mass: 1.2, tension: 92 }}
+            snap={{ mass: 0.3, tension: 126 }}
             rotation={[0, 0, 0]}
-            polar={[-Math.PI / 3.8, Math.PI / 3.8]}
-            azimuth={[-Math.PI / 2.2, Math.PI / 2.2]}
+            polar={[-Math.PI / 4.2, Math.PI / 4.2]}
+            azimuth={[-Math.PI / 2.4, Math.PI / 2.4]}
             cursor={true}
           >
-            <group scale={[zoom, zoom, zoom]}>
+            <group position={[0, -0.08, 0]} scale={[zoom * 1.08, zoom * 1.08, zoom * 1.08]}>
               <RealAlbum3DMVP page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={viewMode} />
             </group>
           </PresentationControls>
-          <ContactShadows position={[0, -0.14, 0]} opacity={0.55} width={5.4} height={5.4} blur={2.4} far={0.3} />
+          <ContactShadows position={[0, -0.18, 0]} opacity={0.42} width={4.2} height={4.2} blur={2.1} far={0.28} />
           <Environment preset="city" background={false} />
         </Canvas>
-
-        <div className="preview3d-config-badges premium-scene-badges" aria-label="Configuração usada no preview 3D">
-          <span>{activeMeta.model}</span>
-          <span>{activeMeta.format}</span>
-          <span>{activeMeta.lombada}</span>
-          <span>{activeMeta.coverType}</span>
-          <span>{ambient.shortName}</span>
-        </div>
-
-        <div className="preview3d-motion-controls premium-scene-controls" aria-label="Controles de visualização 3D">
-          <button type="button" className={viewMode === "cover" ? "on" : ""} onClick={() => setViewMode("cover")}>Capa</button>
-          <button type="button" className={viewMode === "open" ? "on" : ""} onClick={() => setViewMode("open")}>Aberto</button>
-          <button type="button" className={viewMode === "spine" ? "on" : ""} onClick={() => setViewMode("spine")}>Lombada</button>
-          <button type="button" className={viewMode === "back" ? "on" : ""} onClick={() => setViewMode("back")}>Verso</button>
-          <button type="button" onClick={() => zoomBy(0.08)}>Zoom +</button>
-          <button type="button" onClick={() => zoomBy(-0.08)}>Zoom -</button>
-          <button type="button" onClick={resetView}>Reset</button>
-        </div>
 
         <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
         <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={index >= total - 1} aria-label="Folhear para frente">›</button>
@@ -2229,26 +2229,27 @@ function Preview3D({ pages, photoMap }) {
           <span>{page?.title || "Prévia"}</span>
           <strong>{index + 1} / {Math.max(total, 1)}</strong>
         </div>
+      </div>
 
-        <div className="preview3d-ambient-switcher premium-scene-ambient-switcher" aria-label="Navegação discreta do preview 3D">
-          <button type="button" className="preview3d-nav-mini" onClick={() => go(-1)} disabled={index <= 0}>◀</button>
-          {ambients.map((item, itemIndex) => (
-            <button
-              type="button"
-              key={item.id}
-              className={`preview3d-ambient-chip ${itemIndex === ambientIndex ? "on" : ""}`}
-              onClick={() => setAmbientIndex(itemIndex)}
-              aria-label={`Usar cenário ${item.name}`}
-            >
-              <span className="preview3d-ambient-thumb" data-ambient={item.id} />
-              <strong>{item.shortName}</strong>
-            </button>
-          ))}
-          <button type="button" className="preview3d-nav-mini" onClick={() => go(1)} disabled={index >= total - 1}>▶</button>
-        </div>
+      <div className="preview3d-ambient-switcher premium-scene-ambient-switcher" aria-label="Navegação discreta do preview 3D">
+        <button type="button" className="preview3d-nav-mini" onClick={() => go(-1)} disabled={index <= 0}>◀</button>
+        {ambients.map((item, itemIndex) => (
+          <button
+            type="button"
+            key={item.id}
+            className={`preview3d-ambient-chip ${itemIndex === ambientIndex ? "on" : ""}`}
+            onClick={() => setAmbientIndex(itemIndex)}
+            aria-label={`Usar cenário ${item.name}`}
+          >
+            <span className="preview3d-ambient-thumb" data-ambient={item.id} />
+            <strong>{item.shortName}</strong>
+          </button>
+        ))}
+        <button type="button" className="preview3d-nav-mini" onClick={() => go(1)} disabled={index >= total - 1}>▶</button>
       </div>
 
       <div className="preview3d-dots">
+
         {pages.map((item, pageIndex) => (
           <button
             type="button"
@@ -2260,7 +2261,7 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V5.3 restore real 3D preview: álbum físico com palco realístico, câmera ativa e luz natural.
+        V5.4 preview 3D premium organizado: álbum físico centralizado, palco limpo, câmera ativa e controles fora da área principal.
       </p>
     </div>
   );
@@ -2453,29 +2454,29 @@ function getPreview3DMeta(page) {
 function Preview3DEnvironment() {
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.12, 0]}>
-        <circleGeometry args={[4.6, 128]} />
-        <meshStandardMaterial color="#f2ede5" roughness={0.42} metalness={0.03} />
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]}>
+        <circleGeometry args={[2.75, 128]} />
+        <meshStandardMaterial color="#eee6da" roughness={0.72} metalness={0.01} transparent opacity={0.72} />
       </mesh>
-      <mesh receiveShadow position={[0, 0.6, -3.0]}>
-        <planeGeometry args={[8.6, 3.8]} />
-        <meshStandardMaterial color="#edf2f6" roughness={0.92} />
+      <mesh receiveShadow position={[0, 0.72, -2.85]}>
+        <planeGeometry args={[7.2, 3.4]} />
+        <meshStandardMaterial color="#edf0f2" roughness={0.94} transparent opacity={0.46} />
       </mesh>
-      <mesh receiveShadow position={[-2.75, 0.55, -2.4]} rotation={[0, 0.6, 0]}>
-        <planeGeometry args={[3.4, 3.2]} />
-        <meshStandardMaterial color="#e7ecef" roughness={0.92} />
+      <mesh receiveShadow position={[-2.5, 0.56, -2.38]} rotation={[0, 0.5, 0]}>
+        <planeGeometry args={[2.6, 2.6]} />
+        <meshStandardMaterial color="#e8ecef" roughness={0.94} transparent opacity={0.34} />
       </mesh>
-      <mesh receiveShadow position={[2.75, 0.55, -2.4]} rotation={[0, -0.6, 0]}>
-        <planeGeometry args={[3.4, 3.2]} />
-        <meshStandardMaterial color="#eef2f4" roughness={0.92} />
+      <mesh receiveShadow position={[2.5, 0.56, -2.38]} rotation={[0, -0.5, 0]}>
+        <planeGeometry args={[2.6, 2.6]} />
+        <meshStandardMaterial color="#f0f1ef" roughness={0.94} transparent opacity={0.34} />
       </mesh>
-      <mesh position={[-1.8, 0.65, -2.92]}>
-        <planeGeometry args={[1.2, 1.7]} />
-        <meshStandardMaterial color="#fff5de" roughness={0.82} transparent opacity={0.45} />
+      <mesh position={[-1.78, 0.74, -2.82]}>
+        <planeGeometry args={[0.8, 1.16]} />
+        <meshStandardMaterial color="#fff7e4" roughness={0.86} transparent opacity={0.26} />
       </mesh>
-      <mesh position={[1.9, 0.72, -2.92]}>
-        <planeGeometry args={[1.35, 1.9]} />
-        <meshStandardMaterial color="#dce9f7" roughness={0.84} transparent opacity={0.38} />
+      <mesh position={[1.75, 0.76, -2.82]}>
+        <planeGeometry args={[0.88, 1.22]} />
+        <meshStandardMaterial color="#dde9f4" roughness={0.86} transparent opacity={0.22} />
       </mesh>
     </group>
   );
@@ -3433,9 +3434,9 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         )}
         {modal.type === "preview-3d" && (
           <>
-            <h2>Pré-visualização 3D V5.2</h2>
+            <h2>Pré-visualização 3D V5.4</h2>
             <Preview3D pages={modal.pages || []} photoMap={photoMap} />
-            <p>Use as setas na tela ou as teclas ← e → para folhear. As lâminas viram como placas rígidas de álbum 800g. Use o mouse para girar, aproximar e afastar.</p>
+            <p>Use as setas na tela ou as teclas ← e → para folhear. Use o mouse para girar o álbum e os botões de zoom para aproximar ou afastar.</p>
           </>
         )}
         {modal.type === "finalize" && (
