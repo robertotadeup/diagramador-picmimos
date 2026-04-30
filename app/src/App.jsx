@@ -1268,7 +1268,7 @@ export default function App() {
 
   function getProjectPayload() {
     return {
-      version: "V5.5 Preview 3D Realismo Premium",
+      version: "V5.6 Preview 3D Textura Real e Câmera Comercial",
       product: coverModel.label,
       coverModelId,
       coverRule: coverModel.cover,
@@ -1378,8 +1378,8 @@ export default function App() {
         <div className="brand">
           <div className="logo">P</div>
           <div>
-            <strong>Diagramador Picmimos V5.5 Preview 3D Realismo Premium</strong>
-            <span>Preview 3D com álbum físico mais realista, materiais melhores e visual premium</span>
+            <strong>Diagramador Picmimos V5.6 Preview 3D Textura Real e Câmera Comercial</strong>
+            <span>Preview 3D com textura real do projeto, câmera comercial e leitura clara do álbum</span>
           </div>
         </div>
         <div className="top-actions">
@@ -2201,33 +2201,7 @@ function Preview3D({ pages, photoMap }) {
       <div className="preview3d-premium-wrap">
         <div className="preview3d-premium-backdrop" aria-hidden="true" />
         <div className="preview3d-premium-floor" aria-hidden="true" />
-        <Canvas
-          shadows
-          dpr={[1, 1.5]}
-          gl={{ alpha: true, antialias: true }}
-          camera={{ position: [0, 1.48, 4.05], fov: 30 }}
-          className="preview3d-real-canvas"
-        >
-          <color attach="background" args={["transparent"]} />
-          <fog attach="fog" args={["#e8ded0", 7.2, 15]} />
-          <Preview3DLighting ambient={ambient} />
-          <Preview3DEnvironment />
-          <PresentationControls
-            global
-            config={{ mass: 1.2, tension: 92 }}
-            snap={{ mass: 0.3, tension: 126 }}
-            rotation={[0, 0, 0]}
-            polar={[-Math.PI / 4.2, Math.PI / 4.2]}
-            azimuth={[-Math.PI / 2.4, Math.PI / 2.4]}
-            cursor={true}
-          >
-            <group position={[0, -0.02, 0]} scale={[zoom * 1.18, zoom * 1.18, zoom * 1.18]}>
-              <AlbumGLBReadyV4 page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={viewMode} />
-            </group>
-          </PresentationControls>
-          <ContactShadows position={[0, -0.13, 0]} opacity={0.58} width={3.6} height={3.6} blur={1.75} far={0.28} />
-          <Environment preset="city" background={false} />
-        </Canvas>
+        <CommercialAlbumPreview page={renderPage} coverPage={coverPage} photoMap={photoMap} mode={viewMode} zoom={zoom} hasCoverPhoto={hasCoverPhoto} />
 
         <button type="button" className="preview3d-arrow left" onClick={() => go(-1)} disabled={index <= 0} aria-label="Folhear para trás">‹</button>
         <button type="button" className="preview3d-arrow right" onClick={() => go(1)} disabled={index >= total - 1} aria-label="Folhear para frente">›</button>
@@ -2268,12 +2242,128 @@ function Preview3D({ pages, photoMap }) {
         ))}
       </div>
       <p className="preview3d-stable-note premium-scene-note">
-        V5.5 preview 3D realismo premium: álbum físico com melhor material, câmera mais comercial, sombras suaves e ambiente mais elegante.
+        V5.6 preview 3D textura real e câmera comercial: capa e páginas mais legíveis, poses travadas e mockup premium sem branco lavado.
       </p>
     </div>
   );
 }
 
+
+function CommercialAlbumPreview({ page, coverPage, photoMap, mode = "cover", zoom = 1, hasCoverPhoto = false }) {
+  const safePage = page || coverPage;
+  const closedPage = coverPage || page;
+  const isOpen = mode === "open" || safePage?.type === "spread";
+  const poseClass = isOpen ? "pose-open" : `pose-${mode}`;
+  return (
+    <div className="commercial-3d-stage" aria-label="Preview 3D comercial do álbum">
+      <div className="commercial-3d-light" aria-hidden="true" />
+      <div className="commercial-3d-table" aria-hidden="true" />
+      <div className={`commercial-album ${poseClass}`} style={{ "--mockup-zoom": zoom || 1 }}>
+        {isOpen ? (
+          <CommercialOpenAlbum page={safePage?.type === "spread" ? safePage : null} coverPage={closedPage} photoMap={photoMap} />
+        ) : (
+          <CommercialClosedAlbum page={closedPage} photoMap={photoMap} mode={mode} hasCoverPhoto={hasCoverPhoto} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CommercialClosedAlbum({ page, photoMap, mode = "cover", hasCoverPhoto = false }) {
+  if (!page) return null;
+  const coverPhoto = page?.cover?.photoId ? photoMap.get(page.cover.photoId) : null;
+  const textureColor = getTextureColor(page?.texture);
+  const isFullArt = isFullCoverArtPage(page);
+  const panel = getPreviewPanelSpec(page);
+  const surfaceLabel = mode === "back" ? "VERSO" : mode === "spine" ? `LOMBADA ${panel.spineMm} MM` : "CAPA";
+
+  if (mode === "spine") {
+    return (
+      <div className="commercial-spine-view" style={{ "--mockup-texture": textureColor }}>
+        <div className="commercial-spine-board"><span>{surfaceLabel}</span></div>
+        <div className="commercial-page-block thin" />
+        <div className="commercial-shadow" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`commercial-closed-book ${mode === "back" ? "show-back" : "show-front"}`} style={{ "--mockup-texture": textureColor }}>
+      <div className="commercial-cover-stack back" />
+      <div className="commercial-page-block" />
+      <div className="commercial-cover-face">
+        {mode === "back" && !isFullArt ? (
+          <div className="commercial-material-surface"><strong>VERSO</strong><small>{page?.texture?.label || "Revestimento"}</small></div>
+        ) : coverPhoto ? (
+          <PreviewPhotoImage photo={coverPhoto} crop={page.cover} className="commercial-cover-photo" />
+        ) : (
+          <div className="commercial-cover-empty">
+            <strong>Adicione a foto da capa</strong>
+            <span>A prévia 3D usa a imagem real do projeto</span>
+          </div>
+        )}
+      </div>
+      <div className="commercial-spine-strip"><span>{panel.spineMm} mm</span></div>
+      <div className="commercial-edge-highlight" />
+      <div className="commercial-shadow" />
+    </div>
+  );
+}
+
+function CommercialOpenAlbum({ page, coverPage, photoMap }) {
+  const spread = page?.spread;
+  const textureColor = getTextureColor(coverPage?.texture || page?.texture);
+  const frames = spread?.frames || [];
+  const texts = spread?.texts || [];
+  return (
+    <div className="commercial-open-book" style={{ "--mockup-texture": textureColor }}>
+      <div className="commercial-open-cover left" />
+      <div className="commercial-open-cover right" />
+      <div className="commercial-open-block" />
+      <div className="commercial-spread-surface">
+        <div className="commercial-page left" />
+        <div className="commercial-page right" />
+        <div className="commercial-center-crease" />
+        {frames.length ? frames.map((frame, frameIndex) => {
+          const photo = frame.photoId ? photoMap.get(frame.photoId) : null;
+          return (
+            <div
+              key={frame.id || frameIndex}
+              className="commercial-spread-frame"
+              style={{ left: `${frame.x}%`, top: `${frame.y}%`, width: `${frame.w}%`, height: `${frame.h}%` }}
+            >
+              {photo ? <PreviewPhotoImage photo={photo} crop={frame} /> : <div className="commercial-frame-empty" />}
+            </div>
+          );
+        }) : (
+          <div className="commercial-open-empty">
+            <strong>Lâmina em branco</strong>
+            <span>Adicione fotos para ver a página no preview.</span>
+          </div>
+        )}
+        {texts.map((text) => (
+          <div
+            key={text.id}
+            className="commercial-spread-text"
+            style={{
+              left: `${text.x}%`,
+              top: `${text.y}%`,
+              width: `${text.w || 24}%`,
+              fontSize: `${Math.max(11, (text.size || 24) * 0.5)}px`,
+              fontFamily: text.fontFamily || text.font || "serif",
+              color: text.color || "#111",
+              fontWeight: text.weight || 700,
+              textAlign: text.align || "center",
+            }}
+          >
+            {text.value || text.text}
+          </div>
+        ))}
+      </div>
+      <div className="commercial-shadow" />
+    </div>
+  );
+}
 function Preview3DLighting({ ambient }) {
   return (
     <>
@@ -3470,7 +3560,7 @@ function Modal({ modal, onClose, onExport, photoMap }) {
         )}
         {modal.type === "preview-3d" && (
           <>
-            <h2>Pré-visualização 3D V5.5</h2>
+            <h2>Pré-visualização 3D V5.6</h2>
             <Preview3D pages={modal.pages || []} photoMap={photoMap} />
             <p>Use as setas na tela ou as teclas ← e → para folhear. Use o mouse para girar o álbum e os botões de zoom para aproximar ou afastar.</p>
           </>
