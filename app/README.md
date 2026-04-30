@@ -1,20 +1,20 @@
-# Diagramador Picmimos V5.6 Preview 3D Textura Real e Câmera Comercial
+# Diagramador Picmimos V5.7 Preview 3D Capa Fiel e Giro Comercial
 
-Versão focada em corrigir o preview/modal 3D com prioridade em leitura real do projeto: capa, lombada, verso e páginas precisam aparecer com textura/imagem clara, sem depender de um render 3D lavado.
+Versão focada no problema real identificado na V5.6: a capa vista no editor precisava ser recortada e apresentada no preview 3D com mais fidelidade, e o usuário precisava conseguir girar o álbum com o mouse sem cair em ângulos ruins.
 
 ## Objetivo
 
-Trocar o foco de “efeito 3D genérico” para um mockup comercial confiável: câmera travada por modo, arte/página legível, fundo premium com contraste e controles visíveis.
+Aproximar o preview do comportamento esperado em soluções como Sunpics/Auryn: produto configurável, textura real do projeto, capa/páginas legíveis, rotação interativa controlada e visual comercial.
 
-## Escopo da V5.6
+## Escopo da V5.7
 
-- Preview 3D comercial em DOM/CSS 2.5D para maior fidelidade visual.
-- Capa com foto/arte real ou placeholder claro quando faltar imagem.
-- Páginas abertas com fotos e textos visíveis a partir do projeto.
-- Lombada e verso mais limpos, sem peças estranhas/tubos/trilhos.
-- Ambiente menos lavado e com mais contraste.
-- Controles e badges fora da área visual principal.
-- Sem alteração no editor 2D, upload, layouts, crop, textos, validações, productConfigs, package.json ou package-lock.
+- Recorte de capa completa por painel: verso, lombada e frente.
+- Capa fotográfica total usa a arte enviada como textura-base e mostra a frente no modo Capa.
+- Verso e lombada passam a usar o trecho correspondente da arte quando o modelo é capa totalmente fotográfica.
+- Giro por mouse no preview com limites seguros e reset por duplo clique.
+- Mantém a lógica da V5.6 para modo Aberto e página/lâmina real.
+- Mantém controles, badges e ambientes fora da área principal.
+- Sem alteração no editor 2D, upload, layouts, crop, texto, validações, productConfigs, package.json ou package-lock.
 
 ## Arquivos alterados
 
