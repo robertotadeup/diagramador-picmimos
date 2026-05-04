@@ -1,4 +1,4 @@
-// V4.1 Preview 3D Premium com ambientes — Picmimos / Proalbuns
+// V3.7 Configuração 3D por produto — Picmimos / Proalbuns
 // Este arquivo centraliza as configurações comerciais e técnicas do álbum.
 // Futuramente o plugin WordPress/WooCommerce deve alimentar estes mesmos dados.
 
@@ -49,18 +49,11 @@ export const PREVIEW_3D_ADMIN_SCHEMA = {
     "espessura_lamina_mm",
     "tipo_de_virada",
     "abertura",
-    "ambientes_disponiveis",
-    "thumbnail_do_ambiente",
-    "imagem_do_ambiente",
-    "tipo_de_mesa_base",
     "ambiente",
     "camera_inicial",
     "intensidade_luz",
     "sombra",
     "arquivo_gabarito_por_lamina",
-    "arquivo_glb_base",
-    "limite_peso_glb_kb",
-    "resolucao_textura_preview",
   ],
 };
 
@@ -72,13 +65,7 @@ export const PREVIEW_3D_BASE_CONFIG = {
   opening: "layflat_180",
   coverThicknessMm: 3,
   boardThicknessMm: 0.8,
-  environment: "premium_ambients",
-  ambientStrategy: "configurable_room_background_plus_table_base",
-  modelStrategy: "single_lightweight_glb_base_with_parametric_fallback",
-  defaultModelAsset: "/models/album-layflat-lite.glb",
-  maxModelSizeKb: 900,
-  texturePreviewMaxPx: 1400,
-  loadOnlyOnPreview: true,
+  environment: "studio_clean",
   cameraPreset: "front_angled",
   lightPreset: "softbox_studio",
   shadowPreset: "soft_contact_shadow",
@@ -97,7 +84,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: true,
     usesTexture: false,
     description: "O 3D usa uma arte única da capa inteira: verso + lombada + frente. O gabarito muda pela quantidade de lâminas.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
   capa_acrilico: {
     label: "3D: acrílico + textura",
@@ -109,7 +95,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: false,
     usesTexture: true,
     description: "Frente com foto e efeito acrílico; lombada e verso usam a textura escolhida.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
   capa_suede: {
     label: "3D: suede + foto frontal",
@@ -121,7 +106,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: false,
     usesTexture: true,
     description: "Frente com foto; lombada e verso em textura com aparência de suede.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
   capa_madeira: {
     label: "3D: madeira + foto frontal",
@@ -133,7 +117,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: false,
     usesTexture: true,
     description: "Frente com foto; lombada e verso com material madeira/textura cadastrada.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
   capa_tecido: {
     label: "3D: tecido + foto frontal",
@@ -145,7 +128,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: false,
     usesTexture: true,
     description: "Frente com foto; lombada e verso em tecido/textura cadastrada.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
   capa_magnetica: {
     label: "3D: magnética + foto frontal",
@@ -157,7 +139,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: false,
     usesTexture: true,
     description: "Frente com foto; lombada e verso em textura, com regra de capa magnética no plugin.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
   capa_meia_capa: {
     label: "3D: meia capa + textura",
@@ -169,7 +150,6 @@ export const PREVIEW_3D_BY_COVER_MODEL = {
     requiresTemplate: false,
     usesTexture: true,
     description: "Frente com foto obrigatória; lombada e verso usam a textura escolhida.",
-    modelAsset: "/models/album-layflat-lite.glb",
   },
 };
 
