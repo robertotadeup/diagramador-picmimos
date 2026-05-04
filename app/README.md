@@ -1,20 +1,16 @@
-# Diagramador Picmimos V5.7 Preview 3D Capa Fiel e Giro Comercial
+# Diagramador Picmimos V5.8 Preview Comercial Fiel com Snapshots Reais
 
-Versão focada no problema real identificado na V5.6: a capa vista no editor precisava ser recortada e apresentada no preview 3D com mais fidelidade, e o usuário precisava conseguir girar o álbum com o mouse sem cair em ângulos ruins.
+Esta versão corrige o preview para usar snapshots reais do DOM do editor, preservando fotos, crop, zoom, textos e layouts exatamente como o cliente montou.
 
-## Objetivo
+## Escopo da V5.8
 
-Aproximar o preview do comportamento esperado em soluções como Sunpics/Auryn: produto configurável, textura real do projeto, capa/páginas legíveis, rotação interativa controlada e visual comercial.
-
-## Escopo da V5.7
-
-- Recorte de capa completa por painel: verso, lombada e frente.
-- Capa fotográfica total usa a arte enviada como textura-base e mostra a frente no modo Capa.
-- Verso e lombada passam a usar o trecho correspondente da arte quando o modelo é capa totalmente fotográfica.
-- Giro por mouse no preview com limites seguros e reset por duplo clique.
-- Mantém a lógica da V5.6 para modo Aberto e página/lâmina real.
-- Mantém controles, badges e ambientes fora da área principal.
-- Sem alteração no editor 2D, upload, layouts, crop, texto, validações, productConfigs, package.json ou package-lock.
+- Modal “Pré-visualização V5.8”.
+- Captura limpa da capa e das lâminas com `html-to-image`.
+- Ocultação temporária de elementos auxiliares de edição na fonte de snapshot.
+- Modos Capa, Aberto, Lombada e Verso alimentados pelos snapshots reais.
+- Folheio por capa, lâminas e verso.
+- Zoom visual no modal sem alterar o projeto.
+- Sem alteração em upload, crop, layouts do miolo, texto, validações, `productConfigs.js`, `package.json` ou `package-lock.json`.
 
 ## Arquivos alterados
 
